@@ -10,7 +10,7 @@ const user = page.props.auth?.user as any
     <div class="flex items-center justify-between">
       <!-- Left: Brand link -->
       <Link href="/" class="text-sm font-semibold hover:underline">
-        LH-1
+        Home
       </Link>
 
       <!-- Right: User profile + logout -->

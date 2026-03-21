@@ -2,6 +2,7 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import FrontTopNavA from '@/layouts/front/FrontTopNavA.vue'
 import FrontTopNavB from '@/layouts/front/FrontTopNavB.vue'
+import PublicPopupModal from '@/components/public/PublicPopupModal.vue'
 
 function handlePlay(e: Event) {
   const target = e.target as unknown
@@ -33,5 +34,7 @@ onBeforeUnmount(() => {
     <main class="mx-auto max-w-7xl px-4 py-10">
       <slot />
     </main>
+
+    <PublicPopupModal />
   </div>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3'
+import PublicPopupModal from '@/components/public/PublicPopupModal.vue'
 import { computed, ref } from 'vue'
 
 type CategoryItem = {
@@ -221,5 +222,7 @@ function toggleSidebar() {
     </div>
   </div>
 </footer>
+
+    <PublicPopupModal />
   </div>
 </template>

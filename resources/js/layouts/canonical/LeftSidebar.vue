@@ -1,7 +1,6 @@
 <template>
   <nav class="admin-sidebar">
     <div v-for="section in sections" :key="section.title" class="sidebar-section">
-      <!-- Click the title row to expand/collapse extra links -->
       <button
         type="button"
         class="sidebar-section-title-row"
@@ -20,7 +19,6 @@
       </button>
 
       <ul class="sidebar-link-group">
-        <!-- Always-visible links -->
         <li v-for="link in visibleLinks(section)" :key="link.name">
           <Link
             :href="link.route"
@@ -31,7 +29,6 @@
           </Link>
         </li>
 
-        <!-- Dropdown links -->
         <template v-if="section.links.length > ALWAYS_VISIBLE_LINKS && isExpanded(section.title)">
           <li v-for="link in hiddenLinks(section)" :key="link.name">
             <Link
@@ -60,106 +57,81 @@ const ALWAYS_VISIBLE_LINKS = 2
 const page = usePage()
 const currentUrl = computed(() => page.url)
 
-// Helpers
 const isActive = (target: string) => {
   if (target === '/admin') {
     return currentUrl.value === '/admin' || currentUrl.value === '/admin/'
   }
 
-  // If the target includes a query string, match only the base path
   const targetBase = target.split('?')[0]
   return currentUrl.value.startsWith(targetBase)
 }
 
 const cs = (label: string) => `/admin/coming-soon?m=${encodeURIComponent(label)}`
 
-// ✅ DEFINE SECTIONS FIRST (fixes “before initialization”)
 const sections: SidebarSection[] = [
   {
     title: 'Dashboard',
     links: [
       { name: 'Overview', route: '/admin' },
-      { name: 'Activity Feed', route: '/admin/activity' },
-      { name: 'Stats', route: '/admin/stats' },
+      { name: 'Activity', route: cs('Activity') },
     ],
   },
+
   {
-    title: 'Tracks',
+    title: 'Posts',
     links: [
-      { name: 'All Tracks', route: '/admin/music/tracks' },
-      { name: 'Create Track', route: '/admin/music/tracks/create' },
-      { name: 'QC', route: '/admin/qc' },
+      { name: 'All Posts', route: '/admin/posts' },
+      { name: 'Create Post', route: '/admin/posts/create' },
+      { name: 'Categories', route: '/admin/categories' },
+      { name: 'Tags', route: '/admin/tags' },
     ],
   },
+
   {
-    title: 'Commerce',
+    title: 'Popups',
     links: [
-      { name: 'Products', route: '/admin/commerce/products' },
-      { name: 'Prices', route: '/admin/commerce/products' }, // routes to Products for now
-      { name: 'Digital Assets', route: cs('Digital Assets') },
-      { name: 'Orders', route: '/admin/commerce/orders' },
-      { name: 'Payments', route: cs('Payments') },
-      { name: 'Discounts', route: cs('Discounts') },
-      { name: 'Shipping', route: cs('Shipping') },
-      { name: 'Taxes', route: cs('Taxes') },
+      { name: 'All Popups', route: '/admin/popups' },
+      { name: 'Create Popup', route: '/admin/popups/create' },
+      { name: 'Popup Submissions', route: cs('Popup Submissions') },
     ],
   },
+
   {
-    title: 'Albums',
+    title: 'Media',
     links: [
-      { name: 'All Albums', route: '/admin/music/albums' },
-      { name: 'Create Album', route: '/admin/music/albums/create' },
+      { name: 'Library', route: '/admin/media' },
+      { name: 'Browser', route: '/admin/media/browser' },
     ],
   },
+
   {
-    title: 'Music Store',
+    title: 'Site Pages',
     links: [
-      { name: 'Product List', route: '/admin/store/music/products' },
-      { name: 'Pricing Matrix', route: '/admin/store/music/pricing' },
-      { name: 'Promo Codes', route: '/admin/store/music/promos' },
-      { name: 'Orders / Purchases', route: '/admin/store/music/orders' },
+      { name: 'Home', route: cs('Homepage Settings') },
+      { name: 'About', route: cs('About Page') },
+      { name: 'Services', route: cs('Services Page') },
+      { name: 'Consultation', route: cs('Consultation Page') },
+      { name: 'Resources', route: cs('Resources Page') },
+      { name: 'Contact', route: cs('Contact Page') },
     ],
   },
+
   {
-    title: 'Merch Store',
+    title: 'Leads & Clients',
     links: [
-      { name: 'Product List', route: '/admin/store/merch/products' },
-      { name: 'Inventory / Sizes', route: '/admin/store/merch/inventory' },
-      { name: 'Orders / Fulfillment', route: '/admin/store/merch/orders' },
-      { name: 'Shipping Settings', route: '/admin/store/merch/shipping' },
-      { name: 'Tags / Categories', route: '/admin/store/merch/categories' },
+      { name: 'All Leads', route: cs('All Leads') },
+      { name: 'Consultations', route: cs('Consultations') },
     ],
   },
+
   {
-    title: 'Users',
+    title: 'System',
     links: [
-      { name: 'All Users', route: '/admin/users' },
-      { name: 'Roles & Permissions', route: '/admin/users/roles' },
-      { name: 'Invitations', route: '/admin/users/invitations' },
-      { name: 'Bans / Restrictions', route: '/admin/users/bans' },
-    ],
-  },
-  {
-    title: 'Assets & Notes',
-    links: [
-      { name: 'Artwork Upload', route: '/admin/assets/artwork' },
-      { name: 'Track Attachments', route: '/admin/assets/attachments' },
-      { name: 'Notes / Comments', route: '/admin/assets/notes' },
-      { name: 'Shared Files', route: '/admin/assets/files' },
-    ],
-  },
-  {
-    title: 'Analytics',
-    links: [
-      { name: 'Track Plays', route: '/admin/analytics/plays' },
-      { name: 'Sales Reports', route: '/admin/analytics/sales' },
-      { name: 'Conversion Rates', route: '/admin/analytics/conversions' },
-      { name: 'Referral Traffic', route: '/admin/analytics/referrals' },
+      { name: 'Settings', route: cs('Settings') },
     ],
   },
 ]
 
-// Expand/collapse state
 const expanded = reactive<Record<string, boolean>>({})
 
 const isExpanded = (title: string) => !!expanded[title]
@@ -170,7 +142,6 @@ const toggleSection = (title: string) => {
 const visibleLinks = (section: SidebarSection) => section.links.slice(0, ALWAYS_VISIBLE_LINKS)
 const hiddenLinks = (section: SidebarSection) => section.links.slice(ALWAYS_VISIBLE_LINKS)
 
-// Auto-expand if current page is in hidden links (so active page isn't hidden)
 watch(
   () => currentUrl.value,
   () => {

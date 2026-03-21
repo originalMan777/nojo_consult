@@ -19,10 +19,12 @@ services:
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
         volumes:
             - '.:/var/www/html'
+            - '/var/www/html/node_modules'
         networks:
             - sail
         depends_on:
             - mysql
+
     mysql:
         image: 'mysql:8.4'
         ports:
@@ -48,9 +50,11 @@ services:
                 - '-p${DB_PASSWORD}'
             retries: 3
             timeout: 5s
+
 networks:
     sail:
         driver: bridge
+
 volumes:
     sail-mysql:
         driver: local

@@ -1,4 +1,5 @@
 <script setup>
+import { Link } from '@inertiajs/vue3'
 import FrontLayout from '@/layouts/FrontLayout.vue'
 import coverImage from '@/images/cover-1.png'
 </script>
@@ -24,13 +25,20 @@ import coverImage from '@/images/cover-1.png'
           </p>
 
           <div class="flex flex-wrap gap-4">
-            <button class="rounded bg-white px-6 py-3 font-medium text-gray-900">
+            <Link
+              href="/consultation"
+              data-popup-trigger="current-page"
+              class="rounded bg-white px-6 py-3 font-medium text-gray-900"
+            >
               Book a Consultation
-            </button>
+            </Link>
 
-            <button class="rounded border border-white/70 px-6 py-3 font-medium text-white">
+            <Link
+              href="/services"
+              class="rounded border border-white/70 px-6 py-3 font-medium text-white"
+            >
               View Services
-            </button>
+            </Link>
           </div>
         </div>
       </div>
