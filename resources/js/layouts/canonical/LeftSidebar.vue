@@ -119,6 +119,8 @@ const sections: SidebarSection[] = [
   {
     title: 'Leads & Clients',
     links: [
+      { name: 'Lead Boxes', route: '/admin/lead-boxes' },
+      { name: 'Lead Slots', route: '/admin/lead-slots' },
       { name: 'All Leads', route: cs('All Leads') },
       { name: 'Consultations', route: cs('Consultations') },
     ],

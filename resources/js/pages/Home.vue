@@ -1,6 +1,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
 import FrontLayout from '@/layouts/FrontLayout.vue'
+import LeadSlotRenderer from '@/components/public/lead/LeadSlotRenderer.vue'
 import coverImage from '@/images/cover-1.png'
 </script>
 
@@ -46,6 +47,8 @@ import coverImage from '@/images/cover-1.png'
 
     <!-- REST OF PAGE -->
     <div class="mx-auto max-w-6xl space-y-20 px-6 py-16">
+      <LeadSlotRenderer slotKey="home_intro" />
+
       <!-- WHO THIS IS FOR -->
       <!-- WHO THIS IS FOR -->
 <section class="space-y-8">
@@ -151,6 +154,9 @@ import coverImage from '@/images/cover-1.png'
     </div>
   </div>
 </section>
+
+      <LeadSlotRenderer slotKey="home_mid" />
+
       <!-- SERVICES PREVIEW -->
       <!-- SERVICES PREVIEW -->
 <section class="rounded-3xl bg-stone-50 px-6 py-14 md:px-10 md:py-16">
@@ -304,6 +310,8 @@ import coverImage from '@/images/cover-1.png'
     </div>
   </div>
 </section>
+
+      <LeadSlotRenderer slotKey="home_bottom" />
 
       <!-- CTA -->
       <section class="space-y-6 text-center">

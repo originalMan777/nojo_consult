@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import AdminLayout from '@/layouts/AdminLayout.vue'
+import AdminLayout from '@/AppLayouts/AdminLayout.vue'
 
 type PopupRow = {
   id: number

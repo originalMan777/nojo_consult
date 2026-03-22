@@ -1,62 +1,50 @@
 <template>
   <div class="admin-layout flex h-screen w-screen overflow-hidden bg-white text-gray-900">
-    <!-- Sidebar (always visible) -->
     <aside class="w-[180px] shrink-0 border-r border-gray-200 bg-gray-50">
       <Sidebar />
     </aside>
 
-    <!-- Main Content -->
-    <div class="flex flex-col flex-1 overflow-hidden">
-      <!-- Top Nav A -->
-      <TopNavA />
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-100">
+      <div class="flex min-w-0 flex-1 flex-col overflow-hidden p-2">
+        <TopNavA class="overflow-hidden rounded-t-xl" />
+        <TopNavB class="overflow-hidden rounded-b-xl border-x border-gray-200" />
 
-      <!-- Top Nav B -->
-      <TopNavB />
-
-      <!-- Canonical content -->
-    <div class="flex-1 min-h-0 pr-2 pt-2 pb-2">
-        <CanonicalFrame class="h-full">
-          <slot />
-        </CanonicalFrame>
+        <div class="min-h-0 flex-1 pt-2">
+          <CanonicalFrame class="h-full">
+            <slot />
+          </CanonicalFrame>
+        </div>
       </div>
-
-
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import Sidebar from '@/layouts/canonical/LeftSidebar.vue'
 import TopNavA from '@/layouts/canonical/TopNavA.vue'
 import TopNavB from '@/layouts/canonical/TopNavB.vue'
 import CanonicalFrame from '@/layouts/CanonicalFrame.vue'
 
+function handlePlay(event: Event) {
+  const target = event.target as EventTarget | null
 
-function handlePlay(e: Event) {
-  const target = e.target as HTMLElement | null
-  if (!target) return
-
-  // Only enforce for audio (you can expand to video if you want)
   if (!(target instanceof HTMLAudioElement)) return
 
   const audios = Array.from(document.querySelectorAll('audio')) as HTMLAudioElement[]
-  for (const a of audios) {
-    if (a !== target && !a.paused) {
-      a.pause()
+
+  for (const audio of audios) {
+    if (audio !== target && !audio.paused) {
+      audio.pause()
     }
   }
 }
 
 onMounted(() => {
-  // capture = true is important so we catch play events early
   document.addEventListener('play', handlePlay, true)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('play', handlePlay, true)
 })
-
 </script>
-
-

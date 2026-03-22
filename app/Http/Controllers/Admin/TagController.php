@@ -12,12 +12,12 @@ class TagController extends Controller
 {
     public function index()
     {
-        $tags = Tag::query()
+        $categories = Tag::query()
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'created_at', 'updated_at']);
 
-        return Inertia::render('Admin/Tags/Index', [
-            'tags' => $tags,
+        return Inertia::render('Admin/Categories/Index', [
+            'categories' => $categories,
         ]);
     }
 
@@ -31,12 +31,22 @@ class TagController extends Controller
 
         $validated['slug'] = $this->generateUniqueSlug($baseSlug);
 
-        Tag::create([
+        $tag = Tag::create([
             'name' => $validated['name'],
             'slug' => $validated['slug'],
         ]);
 
-        return redirect()->route('admin.tags.index');
+        if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'tag' => [
+                    'id' => $tag->id,
+                    'name' => $tag->name,
+                    'slug' => $tag->slug,
+                ],
+            ], 201);
+        }
+
+        return redirect()->route('admin.categories.index');
     }
 
     public function update(Request $request, Tag $tag)
@@ -54,14 +64,14 @@ class TagController extends Controller
             'slug' => $validated['slug'],
         ]);
 
-        return redirect()->route('admin.tags.index');
+        return redirect()->route('admin.categories.index');
     }
 
     public function destroy(Tag $tag)
     {
         $tag->delete();
 
-        return redirect()->route('admin.tags.index');
+        return redirect()->route('admin.categories.index');
     }
 
     private function validateTag(Request $request): array

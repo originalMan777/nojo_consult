@@ -25,6 +25,8 @@ const props = withDefaults(
 const page = usePage<any>()
 
 const user = computed(() => page.props?.auth?.user ?? null)
+const isAdmin = computed(() => Boolean(user.value?.is_admin))
+const displayName = computed(() => user.value?.name ?? user.value?.email ?? 'Account')
 const categories = computed<CategoryItem[]>(() => page.props?.categories ?? [])
 
 const sidebarOpen = ref(true)
@@ -37,9 +39,7 @@ function toggleSidebar() {
 
 <template>
   <div class="min-h-screen flex flex-col" :class="props.pageClass">
-    <!-- HEADER STACK -->
     <div class="relative z-20">
-      <!-- Floating logo over both nav bars -->
       <Link
         href="/"
         class="absolute left-6 top-1/2 z-30 -translate-y-1/2 md:left-8"
@@ -53,10 +53,9 @@ function toggleSidebar() {
         />
       </Link>
 
-      <!-- TOP NAV -->
       <header class="border-b" :class="props.headerClass">
-        <div class="mx-auto max-w-7xl px-6 py-3 flex items-center justify-end gap-6 pl-44 md:px-8">
-          <nav class="flex items-center gap-6">
+        <div class="mx-auto flex max-w-7xl items-center justify-end gap-3 px-6 py-3 pl-44 md:px-8">
+          <nav class="flex items-center gap-2 sm:gap-4">
             <Link :href="route('blog.index')" class="text-sm text-gray-600 hover:text-gray-900">
               Blog
             </Link>
@@ -66,8 +65,25 @@ function toggleSidebar() {
             </Link>
 
             <template v-if="user">
-              <Link :href="route('dashboard')" class="text-sm text-gray-600 hover:text-gray-900">
+              <span class="hidden text-sm text-gray-500 sm:inline-flex">
+                {{ displayName }}
+              </span>
+
+              <Link
+                v-if="isAdmin"
+                :href="route('dashboard')"
+                class="text-sm text-gray-600 hover:text-gray-900"
+              >
                 Dashboard
+              </Link>
+
+              <Link
+                href="/logout"
+                method="post"
+                as="button"
+                class="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Log out
               </Link>
             </template>
 
@@ -83,7 +99,6 @@ function toggleSidebar() {
         </div>
       </header>
 
-      <!-- SECOND NAV / MENU BAR -->
       <div class="border-b" :class="props.subnavClass">
         <div class="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-3 md:px-8">
           <div></div>
@@ -120,15 +135,12 @@ function toggleSidebar() {
       </div>
     </div>
 
-    <!-- PAGE BODY -->
     <div class="flex-1">
-      <div class="mx-auto max-w-7xl px-6 py-10 flex gap-10">
-        <!-- MAIN CONTENT -->
+      <div class="mx-auto flex max-w-7xl gap-10 px-6 py-10">
         <main class="min-w-0 flex-1">
           <slot />
         </main>
 
-        <!-- RIGHT SIDEBAR -->
         <aside
           v-if="categories.length"
           class="shrink-0 transition-all duration-300"
@@ -178,50 +190,46 @@ function toggleSidebar() {
       </div>
     </div>
 
+    <footer class="mt-10 border-t border-black/5 bg-white">
+      <div class="mx-auto max-w-7xl px-6 py-8">
+        <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div class="flex items-center gap-4">
+            <img
+              src="/images/branding/logo-square.png"
+              alt="Awestruck"
+              class="h-[72px] w-[72px] shrink-0"
+              loading="lazy"
+              decoding="async"
+            />
 
-<!-- FOOTER -->
-<footer class="mt-10 border-t border-black/5 bg-white">
-  <div class="mx-auto max-w-7xl px-6 py-8">
-    <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-      <!-- Left side: logo + powered by -->
-      <div class="flex items-center gap-4">
-        <img
-          src="/images/branding/logo-square.png"
-          alt="Awestruck"
-          class="h-[72px] w-[72px] shrink-0"
-          loading="lazy"
-          decoding="async"
-        />
+            <p class="text-sm font-medium text-gray-700">
+              Powered by <span class="text-gray-900">Awestruk Multimedia</span>
+            </p>
+          </div>
 
-        <p class="text-sm font-medium text-gray-700">
-          Powered by <span class="text-gray-900">Awestruk Multimedia</span>
-        </p>
+          <nav class="flex flex-wrap gap-x-8 gap-y-3 text-sm text-gray-600 md:justify-end">
+            <Link href="/" class="transition hover:text-gray-900">
+              Home
+            </Link>
+            <Link :href="route('blog.index')" class="transition hover:text-gray-900">
+              Blog
+            </Link>
+            <Link href="/sites" class="transition hover:text-gray-900">
+              Sites
+            </Link>
+            <Link href="/about" class="transition hover:text-gray-900">
+              About
+            </Link>
+          </nav>
+        </div>
+
+        <div class="mt-6 border-t border-black/5 pt-4 text-center">
+          <p class="text-xs text-gray-400">
+            © {{ currentYear }} Awestruk Multimedia. All rights reserved.
+          </p>
+        </div>
       </div>
-
-      <!-- Right side: other info -->
-      <nav class="flex flex-wrap gap-x-8 gap-y-3 text-sm text-gray-600 md:justify-end">
-        <Link href="/" class="transition hover:text-gray-900">
-          Home
-        </Link>
-        <Link :href="route('blog.index')" class="transition hover:text-gray-900">
-          Blog
-        </Link>
-        <Link href="/sites" class="transition hover:text-gray-900">
-          Sites
-        </Link>
-        <Link href="/about" class="transition hover:text-gray-900">
-          About
-        </Link>
-      </nav>
-    </div>
-
-    <div class="mt-6 border-t border-black/5 pt-4 text-center">
-      <p class="text-xs text-gray-400">
-        © {{ currentYear }} Awestruk Multimedia. All rights reserved.
-      </p>
-    </div>
-  </div>
-</footer>
+    </footer>
 
     <PublicPopupModal />
   </div>

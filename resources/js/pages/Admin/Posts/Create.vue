@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 import AdminLayout from '@/AppLayouts/AdminLayout.vue';
 
 import InputError from '@/components/InputError.vue';
@@ -23,6 +24,21 @@ const props = defineProps<{
     categories: OptionRow[];
     tags: OptionRow[];
 }>();
+
+const categoriesOptions = ref<OptionRow[]>([...props.categories]);
+const tagsOptions = ref<OptionRow[]>([...props.tags]);
+const isCreatingCategory = ref(false);
+const isCreatingTag = ref(false);
+const categoryCreateError = ref('');
+const tagCreateError = ref('');
+const showMediaLibrary = ref(false);
+const tagInput = ref('');
+const categorySearch = ref('');
+const tagSearch = ref('');
+
+const QUICK_PICK_LIMIT = 6;
+const showMoreCategories = ref(false);
+const showMoreTags = ref(false);
 
 const form = useForm({
     title: '',
@@ -48,9 +64,6 @@ const form = useForm({
 
 const displayTitle = computed(() => form.title?.trim() || 'New Post');
 
-const showMediaLibrary = ref(false);
-const tagInput = ref('');
-
 const quillEditorRef = ref<Quill | null>(null);
 const editorContainerRef = ref<HTMLDivElement | null>(null);
 
@@ -60,6 +73,108 @@ const featuredImagePreviewUrl = ref<string | null>(null);
 const featuredImageDisplayUrl = computed(() => {
     return featuredImagePreviewUrl.value || form.featured_image_path || null;
 });
+
+const selectedTags = computed(() =>
+    tagsOptions.value.filter((tag) => form.tag_ids.includes(tag.id)),
+);
+
+
+const filteredCategoriesOptions = computed(() => {
+    const search = categorySearch.value.trim().toLowerCase();
+
+    if (!search) return categoriesOptions.value;
+
+    return categoriesOptions.value.filter((category) => {
+        return (
+            category.name.toLowerCase().includes(search) ||
+            category.slug.toLowerCase().includes(search)
+        );
+    });
+});
+
+const visibleCategories = computed(() =>
+    filteredCategoriesOptions.value.slice(0, QUICK_PICK_LIMIT),
+);
+
+const overflowCategories = computed(() =>
+    filteredCategoriesOptions.value.slice(QUICK_PICK_LIMIT),
+);
+
+const filteredTagsOptions = computed(() => {
+    const search = tagSearch.value.trim().toLowerCase();
+
+    if (!search) return tagsOptions.value;
+
+    return tagsOptions.value.filter((tag) => {
+        return (
+            tag.name.toLowerCase().includes(search) ||
+            tag.slug.toLowerCase().includes(search)
+        );
+    });
+});
+
+const visibleTags = computed(() =>
+    filteredTagsOptions.value.slice(0, QUICK_PICK_LIMIT),
+);
+
+const overflowTags = computed(() =>
+    filteredTagsOptions.value.slice(QUICK_PICK_LIMIT),
+);
+
+const overflowAvailableTags = computed(() =>
+    overflowTags.value.filter((tag) => !form.tag_ids.includes(tag.id)),
+);
+
+const selectedTagSummary = computed(() => {
+    if (!selectedTags.value.length) return 'Choose tags';
+
+    if (selectedTags.value.length === 1) {
+        return selectedTags.value[0].name;
+    }
+
+    return `${selectedTags.value.length} tags selected`;
+});
+
+const toggleTag = (tagId: number) => {
+    if (form.tag_ids.includes(tagId)) {
+        form.tag_ids = form.tag_ids.filter((id) => id !== tagId);
+        return;
+    }
+
+    form.tag_ids = [...form.tag_ids, tagId];
+};
+
+const removeSelectedTag = (tagId: number) => {
+    form.tag_ids = form.tag_ids.filter((id) => id !== tagId);
+};
+
+
+const selectOverflowCategory = (event: Event) => {
+    const target = event.target as HTMLSelectElement;
+    const value = target.value;
+
+    if (!value) return;
+
+    form.category_id = Number(value);
+    target.value = '';
+    showMoreCategories.value = false;
+};
+
+const selectOverflowTag = (event: Event) => {
+    const target = event.target as HTMLSelectElement;
+    const value = target.value;
+
+    if (!value) return;
+
+    const tagId = Number(value);
+
+    if (!form.tag_ids.includes(tagId)) {
+        form.tag_ids = [...form.tag_ids, tagId];
+    }
+
+    target.value = '';
+    showMoreTags.value = false;
+};
 
 const setPreview = (file: File | null) => {
     if (featuredImagePreviewUrl.value) {
@@ -119,20 +234,87 @@ const removeFeaturedImage = () => {
     setPreview(null);
 };
 
-const addTag = () => {
-    const value = tagInput.value.trim();
+const createTagNow = async () => {
+    const name = tagInput.value.trim();
 
-    if (!value) return;
+    if (!name || isCreatingTag.value) return;
 
-    if (!form.new_tags.includes(value)) {
-        form.new_tags.push(value);
+    isCreatingTag.value = true;
+    tagCreateError.value = '';
+
+    try {
+        const response = await axios.post(route('admin.tags.store'), { name }, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        const created = response.data?.tag as OptionRow | undefined;
+
+        if (!created) {
+            throw new Error('Tag payload missing.');
+        }
+
+        if (!tagsOptions.value.some((tag) => tag.id === created.id)) {
+            tagsOptions.value = [...tagsOptions.value, created].sort((a, b) =>
+                a.name.localeCompare(b.name),
+            );
+        }
+
+        if (!form.tag_ids.includes(created.id)) {
+            form.tag_ids = [...form.tag_ids, created.id];
+        }
+
+        tagInput.value = '';
+        tagSearch.value = '';
+        delete (form.errors as Record<string, string>).new_tags;
+    } catch (error: any) {
+        tagCreateError.value =
+            error?.response?.data?.errors?.name?.[0] ?? 'Unable to save tag right now.';
+    } finally {
+        isCreatingTag.value = false;
     }
-
-    tagInput.value = '';
 };
 
-const removeNewTag = (index: number) => {
-    form.new_tags.splice(index, 1);
+const createCategoryNow = async () => {
+    const name = form.new_category.trim();
+
+    if (!name || isCreatingCategory.value) return;
+
+    isCreatingCategory.value = true;
+    categoryCreateError.value = '';
+
+    try {
+        const response = await axios.post(route('admin.categories.store'), { name }, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        const created = response.data?.category as OptionRow | undefined;
+
+        if (!created) {
+            throw new Error('Category payload missing.');
+        }
+
+        if (!categoriesOptions.value.some((category) => category.id === created.id)) {
+            categoriesOptions.value = [...categoriesOptions.value, created].sort((a, b) =>
+                a.name.localeCompare(b.name),
+            );
+        }
+
+        form.category_id = created.id;
+        form.new_category = '';
+        categorySearch.value = '';
+        delete (form.errors as Record<string, string>).new_category;
+    } catch (error: any) {
+        categoryCreateError.value =
+            error?.response?.data?.errors?.name?.[0] ?? 'Unable to save category right now.';
+    } finally {
+        isCreatingCategory.value = false;
+    }
 };
 
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
@@ -194,329 +376,427 @@ const save = () => {
 <template>
     <Head title="New Post" />
 
-        <AdminLayout>
-    <div class="p-6">
-        <form @submit.prevent="save" class="space-y-6">
-            <div class="sticky top-0 z-40 border-b bg-white">
-                <div class="space-y-2 py-3">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <div class="text-lg font-semibold text-gray-900">
-                                {{ displayTitle }}
+    <AdminLayout>
+        <div class="p-6">
+            <form @submit.prevent="save" class="space-y-6">
+                <div class="sticky top-0 z-40 border-b bg-white">
+                    <div class="space-y-2 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <div class="text-lg font-semibold text-gray-900">
+                                    {{ displayTitle }}
+                                </div>
+                                <div class="mt-1 text-sm text-gray-600">
+                                    Status: <span class="font-medium">Draft</span>
+                                </div>
                             </div>
-                            <div class="mt-1 text-sm text-gray-600">
-                                Status: <span class="font-medium">Draft</span>
+
+                            <div class="flex items-center gap-2">
+                                <PrimaryButton type="submit" :disabled="form.processing">
+                                    {{ form.processing ? 'Saving…' : 'Save' }}
+                                </PrimaryButton>
+
+                                <SecondaryButton type="button" disabled title="Create the draft first">
+                                    Publish
+                                </SecondaryButton>
+
+                                <SecondaryButton type="button" @click="backToPosts">
+                                    Back to Posts
+                                </SecondaryButton>
                             </div>
                         </div>
-
-                        <div class="flex items-center gap-2">
-                            <PrimaryButton type="submit" :disabled="form.processing">
-                                {{ form.processing ? 'Saving…' : 'Save' }}
-                            </PrimaryButton>
-
-                            <SecondaryButton type="button" disabled title="Create the draft first">
-                                Publish
-                            </SecondaryButton>
-
-                            <SecondaryButton type="button" @click="backToPosts">
-                                Back to Posts
-                            </SecondaryButton>
-                        </div>
                     </div>
                 </div>
-            </div>
 
-            <section class="space-y-4 rounded-lg border bg-white p-4">
-                <div class="text-sm font-semibold text-gray-900">Content</div>
+                <section class="space-y-4 rounded-lg border bg-white p-4">
+                    <div class="text-sm font-semibold text-gray-900">Content</div>
 
-                <div>
-                    <InputLabel for="title" value="Title" />
-                    <TextInput
-                        id="title"
-                        v-model="form.title"
-                        type="text"
-                        class="mt-1 block w-full"
-                        autofocus
-                    />
-                    <InputError :message="form.errors.title" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="slug" value="Slug (optional)" />
-                    <TextInput
-                        id="slug"
-                        v-model="form.slug"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.slug" class="mt-2" />
-                    <p class="mt-1 text-xs text-gray-500">
-                        If blank, it will be generated from the title.
-                    </p>
-                </div>
-
-                <div>
-                    <InputLabel value="Content" />
-                    <div id="editor" ref="editorContainerRef" class="mt-1 h-96"></div>
-                    <InputError :message="form.errors.content" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="excerpt" value="Excerpt (optional)" />
-                    <textarea
-                        id="excerpt"
-                        v-model="form.excerpt"
-                        rows="3"
-                        class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                    <InputError :message="form.errors.excerpt" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="sources" value="Sources (optional)" />
-                    <textarea
-                        id="sources"
-                        v-model="form.sources"
-                        rows="6"
-                        class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        placeholder="Plain text references…"
-                    />
-                    <InputError :message="form.errors.sources" class="mt-2" />
-                </div>
-            </section>
-
-            <section class="space-y-4 rounded-lg border bg-white p-4">
-                <div class="text-sm font-semibold text-gray-900">Media</div>
-
-                <div>
-                    <div class="text-sm font-medium text-gray-900">Featured Image</div>
-
-                    <input
-                        ref="featuredImageInputRef"
-                        type="file"
-                        accept="image/*"
-                        class="hidden"
-                        @change="onFileChange"
-                    />
-
-                    <div v-if="featuredImageDisplayUrl" class="mt-3">
-                        <img
-                            :src="featuredImageDisplayUrl"
-                            alt=""
-                            class="h-48 w-full max-w-lg rounded-lg border object-cover"
-                            loading="lazy"
-                            decoding="async"
-                        />
-                        <div class="mt-2 break-all text-xs text-gray-500">
-                            {{ form.featured_image_path || 'New upload selected' }}
-                        </div>
-                    </div>
-
-                    <div v-else class="mt-3 text-sm text-gray-600">
-                        No featured image selected.
-                    </div>
-
-                    <div class="mt-3 flex items-center gap-2">
-                        <SecondaryButton type="button" @click="showMediaLibrary = true">
-                            Choose From Library
-                        </SecondaryButton>
-
-                        <SecondaryButton type="button" @click="openFilePicker">
-                            Upload New
-                        </SecondaryButton>
-
-                        <SecondaryButton
-                            v-if="featuredImageDisplayUrl"
-                            type="button"
-                            @click="removeFeaturedImage"
-                        >
-                            Remove Image
-                        </SecondaryButton>
-                    </div>
-
-                    <InputError :message="(form.errors as any).featured_image" class="mt-2" />
-                    <InputError :message="(form.errors as any).featured_image_path" class="mt-2" />
-                </div>
-            </section>
-
-            <section class="space-y-4 rounded-lg border bg-white p-4">
-                <div class="text-sm font-semibold text-gray-900">Taxonomy</div>
-
-                <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <InputLabel for="category_id" value="Category (optional)" />
-                        <select
-                            id="category_id"
-                            v-model="form.category_id"
-                            class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                            <option :value="null">— None —</option>
-                            <option v-for="c in props.categories" :key="c.id" :value="c.id">
-                                {{ c.name }}
-                            </option>
-                        </select>
-                        <InputError :message="form.errors.category_id" class="mt-2" />
+                        <InputLabel for="title" value="Title" />
+                        <TextInput
+                            id="title"
+                            v-model="form.title"
+                            type="text"
+                            class="mt-1 block w-full"
+                            autofocus
+                        />
+                        <InputError :message="form.errors.title" class="mt-2" />
                     </div>
 
                     <div>
-                        <InputLabel for="tag_ids" value="Tags (optional)" />
-                        <select
-                            id="tag_ids"
-                            v-model="form.tag_ids"
-                            multiple
-                            size="6"
+                        <InputLabel for="slug" value="Slug (optional)" />
+                        <TextInput
+                            id="slug"
+                            v-model="form.slug"
+                            type="text"
+                            class="mt-1 block w-full"
+                        />
+                        <InputError :message="form.errors.slug" class="mt-2" />
+                        <p class="mt-1 text-xs text-gray-500">
+                            If blank, it will be generated from the title.
+                        </p>
+                    </div>
+
+                    <div>
+                        <InputLabel value="Content" />
+                        <div id="editor" ref="editorContainerRef" class="mt-1 h-96"></div>
+                        <InputError :message="form.errors.content" class="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel for="excerpt" value="Excerpt (optional)" />
+                        <textarea
+                            id="excerpt"
+                            v-model="form.excerpt"
+                            rows="3"
                             class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                            <option v-for="t in props.tags" :key="t.id" :value="t.id">
-                                {{ t.name }}
-                            </option>
-                        </select>
-                        <InputError :message="form.errors.tag_ids" class="mt-2" />
-                        <InputError :message="(form.errors as any)['tag_ids.*']" class="mt-2" />
+                        />
+                        <InputError :message="form.errors.excerpt" class="mt-2" />
                     </div>
 
-                    <div class="mt-2">
-                        <InputLabel for="new_category" value="New Category" />
-                        <TextInput
-                            id="new_category"
-                            v-model="form.new_category"
-                            type="text"
-                            class="mt-1 block w-full"
-                            placeholder="Create new category"
+                    <div>
+                        <InputLabel for="sources" value="Sources (optional)" />
+                        <textarea
+                            id="sources"
+                            v-model="form.sources"
+                            rows="6"
+                            class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="Plain text references…"
                         />
-                        <InputError :message="form.errors.new_category" class="mt-2" />
+                        <InputError :message="form.errors.sources" class="mt-2" />
                     </div>
+                </section>
 
-                    <div class="mt-2">
-                        <InputLabel for="new_tag_input" value="Add Tags" />
-                        <TextInput
-                            id="new_tag_input"
-                            v-model="tagInput"
-                            type="text"
-                            class="mt-1 block w-full"
-                            placeholder="Type tag and press Enter"
-                            @keydown.enter.prevent="addTag"
+                <section class="space-y-4 rounded-lg border bg-white p-4">
+                    <div class="text-sm font-semibold text-gray-900">Media</div>
+
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">Featured Image</div>
+
+                        <input
+                            ref="featuredImageInputRef"
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="onFileChange"
                         />
 
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <span
-                                v-for="(tag, index) in form.new_tags"
-                                :key="index"
-                                class="inline-flex items-center gap-2 rounded bg-gray-200 px-2 py-1 text-xs"
+                        <div v-if="featuredImageDisplayUrl" class="mt-3">
+                            <img
+                                :src="featuredImageDisplayUrl"
+                                alt=""
+                                class="h-48 w-full max-w-lg rounded-lg border object-cover"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <div class="mt-2 break-all text-xs text-gray-500">
+                                {{ form.featured_image_path || 'New upload selected' }}
+                            </div>
+                        </div>
+
+                        <div v-else class="mt-3 text-sm text-gray-600">
+                            No featured image selected.
+                        </div>
+
+                        <div class="mt-3 flex items-center gap-2">
+                            <SecondaryButton type="button" @click="showMediaLibrary = true">
+                                Choose From Library
+                            </SecondaryButton>
+
+                            <SecondaryButton type="button" @click="openFilePicker">
+                                Upload New
+                            </SecondaryButton>
+
+                            <SecondaryButton
+                                v-if="featuredImageDisplayUrl"
+                                type="button"
+                                @click="removeFeaturedImage"
                             >
-                                {{ tag }}
-                                <button
-                                    type="button"
-                                    class="text-gray-600 hover:text-gray-900"
-                                    @click="removeNewTag(index)"
-                                >
-                                    ×
-                                </button>
-                            </span>
+                                Remove Image
+                            </SecondaryButton>
                         </div>
 
-                        <InputError :message="form.errors.new_tags" class="mt-2" />
-                        <InputError :message="(form.errors as any)['new_tags.*']" class="mt-2" />
+                        <InputError :message="(form.errors as any).featured_image" class="mt-2" />
+                        <InputError :message="(form.errors as any).featured_image_path" class="mt-2" />
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <section class="space-y-4 rounded-lg border bg-white p-4">
-                <div class="text-sm font-semibold text-gray-900">SEO</div>
+                
+<section class="space-y-4 rounded-lg border bg-white p-4">
+    <div class="text-sm font-semibold text-gray-900">Taxonomy</div>
 
-                <div>
-                    <InputLabel for="meta_title" value="Meta Title (optional)" />
-                    <TextInput
-                        id="meta_title"
-                        v-model="form.meta_title"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.meta_title" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="meta_description" value="Meta Description (optional)" />
-                    <textarea
-                        id="meta_description"
-                        v-model="form.meta_description"
-                        rows="3"
-                        class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                    <InputError :message="form.errors.meta_description" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="canonical_url" value="Canonical URL (optional)" />
-                    <TextInput
-                        id="canonical_url"
-                        v-model="form.canonical_url"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.canonical_url" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="og_title" value="OG Title (optional)" />
-                    <TextInput
-                        id="og_title"
-                        v-model="form.og_title"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.og_title" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="og_description" value="OG Description (optional)" />
-                    <textarea
-                        id="og_description"
-                        v-model="form.og_description"
-                        rows="3"
-                        class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                    <InputError :message="form.errors.og_description" class="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel for="og_image_path" value="OG Image Path (optional)" />
-                    <TextInput
-                        id="og_image_path"
-                        v-model="form.og_image_path"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.og_image_path" class="mt-2" />
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <input
-                        id="noindex"
-                        v-model="form.noindex"
-                        type="checkbox"
-                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label for="noindex" class="text-sm text-gray-700">Noindex</label>
-                </div>
-
-                <InputError :message="form.errors.noindex" class="mt-2" />
-            </section>
-
-            <div class="flex items-center gap-3">
-                <PrimaryButton type="submit" :disabled="form.processing">
-                    {{ form.processing ? 'Saving…' : 'Create Draft' }}
-                </PrimaryButton>
+    <div class="space-y-6">
+        <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+                <InputLabel value="Category (optional)" />
+                <button
+                    v-if="overflowCategories.length"
+                    type="button"
+                    class="text-sm font-medium text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline"
+                    @click="showMoreCategories = !showMoreCategories"
+                >
+                    {{ showMoreCategories ? 'Less' : 'More…' }}
+                </button>
             </div>
-        </form>
+
+            <TextInput
+                v-model="categorySearch"
+                type="text"
+                class="block h-9 w-full max-w-md"
+                placeholder="Search categories"
+            />
+
+            <div class="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    class="rounded-md border px-3 py-1.5 text-sm transition"
+                    :class="form.category_id === null ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:text-gray-900'"
+                    @click="form.category_id = null"
+                >
+                    None
+                </button>
+
+                <button
+                    v-for="category in visibleCategories"
+                    :key="category.id"
+                    type="button"
+                    class="rounded-md border px-3 py-1.5 text-sm transition"
+                    :class="form.category_id === category.id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:text-gray-900'"
+                    @click="form.category_id = category.id"
+                >
+                    {{ category.name }}
+                </button>
+            </div>
+
+            <div v-if="!filteredCategoriesOptions.length" class="text-sm text-gray-500">
+                No matching categories.
+            </div>
+
+            <div v-if="showMoreCategories && overflowCategories.length" class="max-w-md">
+                <select
+                    class="block h-9 w-full rounded-md border-gray-300 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    @change="selectOverflowCategory"
+                >
+                    <option value="">Choose more categories</option>
+                    <option
+                        v-for="category in overflowCategories"
+                        :key="category.id"
+                        :value="category.id"
+                    >
+                        {{ category.name }}
+                    </option>
+                </select>
+            </div>
+
+            <div class="max-w-md">
+                <div class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Add Category
+                </div>
+                <div class="flex items-center gap-2">
+                    <TextInput
+                        v-model="form.new_category"
+                        type="text"
+                        class="block h-9 w-full"
+                        placeholder="New category name"
+                        @keydown.enter.prevent="createCategoryNow"
+                    />
+                    <PrimaryButton
+                        type="button"
+                        class="h-9 shrink-0 px-3 text-sm"
+                        :disabled="isCreatingCategory || !form.new_category.trim()"
+                        @click="createCategoryNow"
+                    >
+                        {{ isCreatingCategory ? 'Adding…' : 'Add' }}
+                    </PrimaryButton>
+                </div>
+                <InputError :message="categoryCreateError || form.errors.new_category" class="mt-2" />
+            </div>
+
+            <InputError :message="form.errors.category_id" class="mt-2" />
         </div>
 
-        <MediaLibraryModal
-            :open="showMediaLibrary"
-            :selected-path="form.featured_image_path"
-            default-folder="blog"
-            @update:open="showMediaLibrary = $event"
-            @select="selectFeaturedImage"
-        />
+        <div class="space-y-3 border-t border-gray-100 pt-5">
+            <div class="flex items-center justify-between gap-3">
+                <InputLabel value="Tags" />
+                <button
+                    v-if="overflowAvailableTags.length"
+                    type="button"
+                    class="text-sm font-medium text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline"
+                    @click="showMoreTags = !showMoreTags"
+                >
+                    {{ showMoreTags ? 'Less' : 'More…' }}
+                </button>
+            </div>
+
+            <TextInput
+                v-model="tagSearch"
+                type="text"
+                class="block h-9 w-full max-w-md"
+                placeholder="Search tags"
+            />
+
+            <div class="flex flex-wrap gap-2">
+                <button
+                    v-for="tag in visibleTags"
+                    :key="tag.id"
+                    type="button"
+                    class="rounded-md border px-3 py-1.5 text-sm transition"
+                    :class="form.tag_ids.includes(tag.id) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:text-gray-900'"
+                    @click="toggleTag(tag.id)"
+                >
+                    {{ tag.name }}
+                </button>
+            </div>
+
+            <div v-if="!filteredTagsOptions.length" class="text-sm text-gray-500">
+                No matching tags.
+            </div>
+
+            <div v-if="showMoreTags && overflowAvailableTags.length" class="max-w-md">
+                <select
+                    class="block h-9 w-full rounded-md border-gray-300 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    @change="selectOverflowTag"
+                >
+                    <option value="">Choose more tags</option>
+                    <option
+                        v-for="tag in overflowAvailableTags"
+                        :key="tag.id"
+                        :value="tag.id"
+                    >
+                        {{ tag.name }}
+                    </option>
+                </select>
+            </div>
+
+            <div class="max-w-md">
+                <div class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Add Tag
+                </div>
+                <div class="flex items-center gap-2">
+                    <TextInput
+                        v-model="tagInput"
+                        type="text"
+                        class="block h-9 w-full"
+                        placeholder="New tag name"
+                        @keydown.enter.prevent="createTagNow"
+                    />
+                    <PrimaryButton
+                        type="button"
+                        class="h-9 shrink-0 px-3 text-sm"
+                        :disabled="isCreatingTag || !tagInput.trim()"
+                        @click="createTagNow"
+                    >
+                        {{ isCreatingTag ? 'Adding…' : 'Add' }}
+                    </PrimaryButton>
+                </div>
+                <InputError :message="tagCreateError || (form.errors as any).new_tags" class="mt-2" />
+            </div>
+
+            <div v-if="selectedTags.length" class="flex flex-wrap gap-2 pt-1">
+                <button
+                    v-for="tag in selectedTags"
+                    :key="tag.id"
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200"
+                    @click="removeSelectedTag(tag.id)"
+                >
+                    <span>{{ tag.name }}</span>
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+
+            <InputError :message="form.errors.tag_ids" class="mt-2" />
+        </div>
+    </div>
+</section>
+
+
+                <section class="space-y-4 rounded-lg border bg-white p-4">
+                    <div class="text-sm font-semibold text-gray-900">SEO</div>
+
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div>
+                            <InputLabel for="meta_title" value="Meta Title" />
+                            <TextInput
+                                id="meta_title"
+                                v-model="form.meta_title"
+                                type="text"
+                                class="mt-1 block w-full"
+                            />
+                            <InputError :message="form.errors.meta_title" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="canonical_url" value="Canonical URL" />
+                            <TextInput
+                                id="canonical_url"
+                                v-model="form.canonical_url"
+                                type="text"
+                                class="mt-1 block w-full"
+                            />
+                            <InputError :message="form.errors.canonical_url" class="mt-2" />
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <InputLabel for="meta_description" value="Meta Description" />
+                            <textarea
+                                id="meta_description"
+                                v-model="form.meta_description"
+                                rows="3"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            />
+                            <InputError :message="form.errors.meta_description" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="og_title" value="OG Title" />
+                            <TextInput
+                                id="og_title"
+                                v-model="form.og_title"
+                                type="text"
+                                class="mt-1 block w-full"
+                            />
+                            <InputError :message="form.errors.og_title" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="og_image_path" value="OG Image Path" />
+                            <TextInput
+                                id="og_image_path"
+                                v-model="form.og_image_path"
+                                type="text"
+                                class="mt-1 block w-full"
+                            />
+                            <InputError :message="form.errors.og_image_path" class="mt-2" />
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <InputLabel for="og_description" value="OG Description" />
+                            <textarea
+                                id="og_description"
+                                v-model="form.og_description"
+                                rows="3"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            />
+                            <InputError :message="form.errors.og_description" class="mt-2" />
+                        </div>
+
+                        <label class="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-3">
+                            <input
+                                v-model="form.noindex"
+                                type="checkbox"
+                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span class="text-sm text-gray-700">Noindex this post</span>
+                        </label>
+                    </div>
+                </section>
+            </form>
+
+            <MediaLibraryModal
+                v-model:show="showMediaLibrary"
+                @select="selectFeaturedImage"
+            />
+        </div>
     </AdminLayout>
 </template>

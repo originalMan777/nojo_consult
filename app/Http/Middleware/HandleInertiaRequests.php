@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Popup;
+use App\Services\LeadSlots\LeadSlotResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -36,10 +37,32 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'popupManager' => fn () => $this->resolvePopupManager($request),
+            'leadSlots' => fn () => $this->resolveLeadSlots($request),
         ];
     }
 
-    /**
+        /**
+     * @return array<string, array<string,mixed>|null>
+     */
+    private function resolveLeadSlots(Request $request): array
+    {
+        $pageKey = $this->resolvePopupPageKey($request);
+
+        if (! $pageKey || ! $this->leadTablesAreReady()) {
+            return [];
+        }
+
+        return app(LeadSlotResolver::class)->resolve($pageKey);
+    }
+
+    private function leadTablesAreReady(): bool
+    {
+        return Schema::hasTable('lead_slots')
+            && Schema::hasTable('lead_assignments')
+            && Schema::hasTable('lead_boxes');
+    }
+
+/**
      * @return array{pageKey:?string,leadCaptured:bool,isAuthenticated:bool,popups:array<int,array<string,mixed>>}
      */
     private function resolvePopupManager(Request $request): array

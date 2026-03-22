@@ -5,7 +5,12 @@ use App\Http\Controllers\Admin\MediaLibraryController;
 use App\Http\Controllers\Admin\PopupController as AdminPopupController;
 use App\Http\Controllers\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Admin\TagController;
-use App\Http\Controllers\Public\PopupLeadController;
+use App\Http\Controllers\Admin\LeadBoxController;
+use App\Http\Controllers\Admin\LeadSlotController;
+use App\Http\Controllers\Admin\ResourceLeadBoxController;
+use App\Http\Controllers\Admin\ServiceLeadBoxController;
+use App\Http\Controllers\Admin\OfferLeadBoxController;
+use App\Http\Controllers\Public\LeadController;
 use App\Http\Controllers\Public\PostController as PublicPostController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -22,14 +27,6 @@ Route::get('/services', function () {
     return Inertia::render('Services');
 })->name('services');
 
-Route::get('/buyers', function () {
-    return Inertia::render('Buyers');
-})->name('buyers');
-
-Route::get('/sellers', function () {
-    return Inertia::render('Sellers');
-})->name('sellers');
-
 Route::get('/consultation', function () {
     return Inertia::render('Consultation');
 })->name('consultation');
@@ -42,15 +39,29 @@ Route::get('/contact', function () {
     return Inertia::render('Contact');
 })->name('contact');
 
-Route::post('/popup-leads', [PopupLeadController::class, 'store'])->name('popup-leads.store');
+Route::get('/buyers', function () {
+    return Inertia::render('Buyers');
+})->name('buyers');
+
+Route::get('/sellers', function () {
+    return Inertia::render('Sellers');
+})->name('sellers');
 
 Route::get('/blog', [PublicPostController::class, 'index'])->name('blog.index');
 Route::get('/blog/category/{slug}', [PublicPostController::class, 'category'])->name('blog.category');
 Route::get('/blog/tag/{slug}', [PublicPostController::class, 'tag'])->name('blog.tag');
 Route::get('/blog/{slug}', [PublicPostController::class, 'show'])->name('blog.show');
 
-Route::middleware(['auth', 'verified', 'admin'])->group(function () {
-    Route::redirect('/dashboard', '/admin')->name('dashboard');
+Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
+
+Route::middleware(['auth'])->group(function () {
+    Route::redirect('/profile', '/settings/profile')->name('profile');
+
+    Route::get('/dashboard', function () {
+        return auth()->user()->is_admin
+            ? redirect('/admin')
+            : redirect('/profile');
+    })->name('dashboard');
 });
 
 Route::middleware(['auth', 'verified', 'admin'])
@@ -58,7 +69,7 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->as('admin.')
     ->group(function () {
         Route::get('/', function () {
-            return Inertia::render('admin/Dashboard');
+            return Inertia::render('Admin/Dashboard');
         })->name('index');
 
         Route::get('/posts', [AdminPostController::class, 'index'])->name('posts.index');
@@ -86,6 +97,21 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::post('/media', [MediaLibraryController::class, 'store'])->name('media.store');
         Route::delete('/media', [MediaLibraryController::class, 'destroy'])->name('media.destroy');
 
+        Route::get('/lead-boxes', [LeadBoxController::class, 'index'])->name('lead-boxes.index');
+        Route::get('/lead-boxes/create', [LeadBoxController::class, 'create'])->name('lead-boxes.create');
+        Route::get('/lead-boxes/{leadBox}/edit', [LeadBoxController::class, 'edit'])->name('lead-boxes.edit');
+
+        Route::post('/lead-boxes/resource', [ResourceLeadBoxController::class, 'store'])->name('lead-boxes.resource.store');
+        Route::put('/lead-boxes/resource/{leadBox}', [ResourceLeadBoxController::class, 'update'])->name('lead-boxes.resource.update');
+
+        Route::post('/lead-boxes/service', [ServiceLeadBoxController::class, 'store'])->name('lead-boxes.service.store');
+        Route::put('/lead-boxes/service/{leadBox}', [ServiceLeadBoxController::class, 'update'])->name('lead-boxes.service.update');
+
+        Route::post('/lead-boxes/offer', [OfferLeadBoxController::class, 'store'])->name('lead-boxes.offer.store');
+        Route::put('/lead-boxes/offer/{leadBox}', [OfferLeadBoxController::class, 'update'])->name('lead-boxes.offer.update');
+Route::get('/lead-slots', [LeadSlotController::class, 'index'])->name('lead-slots.index');
+        Route::put('/lead-slots/{leadSlot}', [LeadSlotController::class, 'update'])->name('lead-slots.update');
+
         Route::get('/popups', [AdminPopupController::class, 'index'])->name('popups.index');
         Route::get('/popups/create', [AdminPopupController::class, 'create'])->name('popups.create');
         Route::post('/popups', [AdminPopupController::class, 'store'])->name('popups.store');
@@ -94,7 +120,7 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::delete('/popups/{popup}', [AdminPopupController::class, 'destroy'])->name('popups.destroy');
 
         Route::get('/coming-soon', function () {
-            return Inertia::render('admin/Dashboard');
+            return Inertia::render('Admin/Dashboard');
         })->name('coming-soon');
     });
 
