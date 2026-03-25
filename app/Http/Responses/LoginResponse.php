@@ -11,6 +11,12 @@ class LoginResponse implements LoginResponseContract
      */
     public function toResponse($request)
     {
-        return redirect()->intended('/profile');
+        $user = $request->user();
+
+        if ($user && $user->is_admin) {
+            return redirect('/dashboard');
+        }
+
+        return redirect('/');
     }
 }

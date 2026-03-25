@@ -26,14 +26,7 @@ const sections = [
         description: 'Upload and manage images and media assets.',
         href: route('admin.media.index'),
         action: 'Open Media',
-    },
-    {
-        title: 'Blog Index Sections',
-        description: 'Control the fixed wide and cluster sections on the public blog index.',
-        href: route('admin.blog-index-sections.index'),
-        action: 'Open Sections',
-    },
-    {
+    },    {
         title: 'Popups',
         description: 'Control popup content, triggers, targeting, and lead capture.',
         href: route('admin.popups.index'),

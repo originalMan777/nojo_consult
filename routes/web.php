@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Admin\BlogIndexSectionController;
+use App\Http\Controllers\Admin\AiPostImporterController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\LeadBoxController;
 use App\Http\Controllers\Admin\LeadSlotController;
@@ -13,7 +13,6 @@ use App\Http\Controllers\Admin\ServiceLeadBoxController;
 use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\ContentFormula\ContentFormulaController;
 use App\Http\Controllers\Public\LeadController;
-use App\Http\Controllers\Public\PopupLeadController;
 use App\Http\Controllers\Public\PostController as PublicPostController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -86,11 +85,6 @@ Route::get('/blog/tag/{slug}', [PublicPostController::class, 'tag'])->name('blog
 Route::get('/blog/{slug}', [PublicPostController::class, 'show'])->name('blog.show');
 
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
-Route::post('/popup-leads', [PopupLeadController::class, 'store'])->name('popup-leads.store');
-
-Route::middleware(['auth'])->group(function () {
-    Route::redirect('/profile', '/settings/profile')->name('profile');
-});
 
 Route::middleware(['auth', 'admin'])
     ->get('/dashboard', function () {
@@ -147,15 +141,15 @@ Route::middleware(['auth', 'admin'])
         Route::get('/lead-slots', [LeadSlotController::class, 'index'])->name('lead-slots.index');
         Route::put('/lead-slots/{leadSlot}', [LeadSlotController::class, 'update'])->name('lead-slots.update');
 
-        Route::get('/blog-index-sections', [BlogIndexSectionController::class, 'index'])->name('blog-index-sections.index');
-        Route::put('/blog-index-sections', [BlogIndexSectionController::class, 'update'])->name('blog-index-sections.update');
-
         Route::get('/popups', [AdminPopupController::class, 'index'])->name('popups.index');
         Route::get('/popups/create', [AdminPopupController::class, 'create'])->name('popups.create');
         Route::post('/popups', [AdminPopupController::class, 'store'])->name('popups.store');
         Route::get('/popups/{popup}/edit', [AdminPopupController::class, 'edit'])->name('popups.edit');
         Route::put('/popups/{popup}', [AdminPopupController::class, 'update'])->name('popups.update');
         Route::delete('/popups/{popup}', [AdminPopupController::class, 'destroy'])->name('popups.destroy');
+
+        Route::get('/post-importer', [AiPostImporterController::class, 'index'])->name('post-importer.index');
+        Route::post('/post-importer', [AiPostImporterController::class, 'store'])->name('post-importer.store');
 
         Route::get('/coming-soon', function () {
             return Inertia::render('Admin/Dashboard');

@@ -130,9 +130,10 @@ const sections: SidebarSection[] = [
         ],
     },
     {
-        title: 'Content',
+        title: 'Tools',
         links: [
-            { name: 'Content Formula Tool', route: '/admin/content-formula' },
+            { name: 'Generator', route: '/admin/content-formula' },
+            { name: 'Post Importer', route: '/admin/post-importer' },
         ],
     },
     {
