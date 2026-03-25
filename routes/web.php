@@ -1,20 +1,22 @@
 <?php
 
+use App\Http\Controllers\Admin\BlogIndexSectionController;
 use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\MediaLibraryController;
-use App\Http\Controllers\Admin\PopupController as AdminPopupController;
-use App\Http\Controllers\Admin\PostController as AdminPostController;
-use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\Admin\LeadBoxController;
 use App\Http\Controllers\Admin\LeadSlotController;
+use App\Http\Controllers\Admin\MediaLibraryController;
+use App\Http\Controllers\Admin\OfferLeadBoxController;
+use App\Http\Controllers\Admin\PopupController as AdminPopupController;
+use App\Http\Controllers\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Admin\ResourceLeadBoxController;
 use App\Http\Controllers\Admin\ServiceLeadBoxController;
-use App\Http\Controllers\Admin\OfferLeadBoxController;
+use App\Http\Controllers\Admin\TagController;
+use App\Http\Controllers\ContentFormula\ContentFormulaController;
 use App\Http\Controllers\Public\LeadController;
+use App\Http\Controllers\Public\PopupLeadController;
 use App\Http\Controllers\Public\PostController as PublicPostController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\ContentFormula\ContentFormulaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,7 +34,7 @@ use App\Http\Controllers\ContentFormula\ContentFormulaController;
 |
 */
 
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -84,16 +86,18 @@ Route::get('/blog/tag/{slug}', [PublicPostController::class, 'tag'])->name('blog
 Route::get('/blog/{slug}', [PublicPostController::class, 'show'])->name('blog.show');
 
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
+Route::post('/popup-leads', [PopupLeadController::class, 'store'])->name('popup-leads.store');
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/profile', '/settings/profile')->name('profile');
-
-    Route::get('/dashboard', function () {
-        return redirect('/profile');
-    })->name('dashboard');
 });
 
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'admin'])
+    ->get('/dashboard', function () {
+        return to_route('admin.index');
+    })->name('dashboard');
+
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
@@ -139,8 +143,12 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         Route::post('/lead-boxes/offer', [OfferLeadBoxController::class, 'store'])->name('lead-boxes.offer.store');
         Route::put('/lead-boxes/offer/{leadBox}', [OfferLeadBoxController::class, 'update'])->name('lead-boxes.offer.update');
-Route::get('/lead-slots', [LeadSlotController::class, 'index'])->name('lead-slots.index');
+
+        Route::get('/lead-slots', [LeadSlotController::class, 'index'])->name('lead-slots.index');
         Route::put('/lead-slots/{leadSlot}', [LeadSlotController::class, 'update'])->name('lead-slots.update');
+
+        Route::get('/blog-index-sections', [BlogIndexSectionController::class, 'index'])->name('blog-index-sections.index');
+        Route::put('/blog-index-sections', [BlogIndexSectionController::class, 'update'])->name('blog-index-sections.update');
 
         Route::get('/popups', [AdminPopupController::class, 'index'])->name('popups.index');
         Route::get('/popups/create', [AdminPopupController::class, 'create'])->name('popups.create');

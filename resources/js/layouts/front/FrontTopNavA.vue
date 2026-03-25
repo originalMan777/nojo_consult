@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { Link } from '@inertiajs/vue3'
+import { usePublicAuthNavigation } from '@/composables/usePublicAuthNavigation'
 
-const page = usePage<any>()
-const user = computed(() => page.props.auth?.user ?? null)
-const displayName = computed(() => user.value?.name ?? user.value?.email ?? 'Account')
-const isAdmin = computed(() => Boolean(user.value?.is_admin))
+const { user, displayName, dashboardHref, profileHref } = usePublicAuthNavigation()
 </script>
 
 <template>
@@ -44,8 +41,15 @@ const isAdmin = computed(() => Boolean(user.value?.is_admin))
           </div>
 
           <Link
-            v-if="isAdmin"
-            :href="route('dashboard')"
+            :href="profileHref"
+            class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            Profile
+          </Link>
+
+          <Link
+            v-if="dashboardHref"
+            :href="dashboardHref"
             class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             Dashboard

@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LeadAssignment extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'lead_slot_id',
         'lead_box_id',

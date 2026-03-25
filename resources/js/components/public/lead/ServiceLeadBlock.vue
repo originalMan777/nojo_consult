@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import LeadAccentBadge from '@/components/public/lead/LeadAccentBadge.vue';
 import type { LeadBlockRenderModel } from '@/types/leadBlocks';
 
 const props = defineProps<{
@@ -17,7 +18,9 @@ const reassurance = computed(() => {
 });
 
 const consultHref = computed(() => {
-    if (props.previewMode) return '#';
+    if (props.previewMode) {
+        return '#';
+    }
 
     return route('consultation', {
         source: 'service_lead_block',
@@ -32,19 +35,33 @@ const consultHref = computed(() => {
     <section
         class="relative overflow-hidden rounded-[32px] bg-white px-6 py-10 shadow-[0_30px_80px_rgba(15,23,42,0.10)] ring-1 ring-black/5 md:px-10 md:py-14"
     >
+        <LeadAccentBadge />
+
         <div class="pointer-events-none absolute inset-0">
             <div class="absolute inset-x-10 top-0 h-px bg-black/8"></div>
-            <div class="absolute left-10 bottom-6 h-3 w-14 rounded-full bg-slate-200/70"></div>
-            <div class="absolute right-10 bottom-6 h-3 w-14 rounded-full bg-slate-200/70"></div>
-            <div class="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-200/35 blur-3xl"></div>
+            <div
+                class="absolute bottom-6 left-10 h-3 w-14 rounded-full bg-slate-200/70"
+            ></div>
+            <div
+                class="absolute right-10 bottom-6 h-3 w-14 rounded-full bg-slate-200/70"
+            ></div>
+            <div
+                class="absolute top-1/2 left-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-200/35 blur-3xl"
+            ></div>
         </div>
 
-        <div class="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500">
+        <div
+            class="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center"
+        >
+            <p
+                class="text-[11px] font-semibold tracking-[0.22em] text-gray-500 uppercase"
+            >
                 {{ eyebrow }}
             </p>
 
-            <h3 class="mt-3 text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
+            <h3
+                class="mt-3 text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl"
+            >
                 {{ model.title }}
             </h3>
 
@@ -59,7 +76,7 @@ const consultHref = computed(() => {
                 <Link
                     v-if="!previewMode"
                     :href="consultHref"
-                    class="inline-flex items-center justify-center rounded-2xl bg-gray-900 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800"
+                    class="inline-flex items-center justify-center rounded-2xl bg-[#1d3f1f] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(29,63,31,0.18)] transition hover:bg-[#173319]"
                 >
                     {{ model.buttonText || 'Book a consultation' }}
                 </Link>
@@ -67,7 +84,7 @@ const consultHref = computed(() => {
                 <button
                     v-else
                     type="button"
-                    class="inline-flex cursor-not-allowed items-center justify-center rounded-2xl bg-gray-900 px-6 py-3.5 text-sm font-semibold text-white opacity-70"
+                    class="inline-flex cursor-not-allowed items-center justify-center rounded-2xl bg-[#1d3f1f] px-6 py-3.5 text-sm font-semibold text-white opacity-70"
                     disabled
                 >
                     {{ model.buttonText || 'Book a consultation' }}
@@ -76,7 +93,7 @@ const consultHref = computed(() => {
 
             <p
                 v-if="reassurance"
-                class="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500"
+                class="mt-4 text-xs font-semibold tracking-[0.18em] text-gray-500 uppercase"
             >
                 {{ reassurance }}
             </p>

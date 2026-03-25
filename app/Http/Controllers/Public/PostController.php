@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Models\BlogIndexSection;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -18,22 +20,9 @@ class PostController extends Controller
             ->published()
             ->with(['category:id,name,slug'])
             ->orderByDesc('published_at')
-            ->select(['id', 'title', 'slug', 'excerpt', 'published_at', 'category_id', 'featured_image_path'])
-            ->paginate(10)
-            ->through(fn (Post $post) => [
-                'id' => $post->id,
-                'title' => $post->title,
-                'slug' => $post->slug,
-                'excerpt' => $post->excerpt,
-                'published_at' => $post->published_at,
-                'featured_image_url' => $post->featured_image_url,
-                'category' => $post->category
-                    ? [
-                        'name' => $post->category->name,
-                        'slug' => $post->category->slug,
-                    ]
-                    : null,
-            ]);
+            ->select(['id', 'title', 'slug', 'excerpt', 'content', 'published_at', 'category_id', 'featured_image_path'])
+            ->paginate(18)
+            ->withQueryString();
 
         $categories = Category::query()
             ->withCount([
@@ -48,9 +37,43 @@ class PostController extends Controller
             ])
             ->values();
 
+        $usedIds = $posts->getCollection()->pluck('id')->all();
+        $sections = BlogIndexSection::query()
+            ->with('category:id,name,slug')
+            ->whereIn('section_key', BlogIndexSection::SECTION_KEYS)
+            ->get()
+            ->keyBy('section_key');
+
+        $wideSection = $this->buildSectionPayload(
+            $sections->get(BlogIndexSection::KEY_WIDE),
+            6,
+            $usedIds,
+        );
+
+        $clusterLeft = $this->buildSectionPayload(
+            $sections->get(BlogIndexSection::KEY_CLUSTER_LEFT),
+            4,
+            $usedIds,
+        );
+
+        $clusterRight = $this->buildSectionPayload(
+            $sections->get(BlogIndexSection::KEY_CLUSTER_RIGHT),
+            4,
+            $usedIds,
+        );
+
+        $posts->setCollection(
+            $posts->getCollection()->map(fn (Post $post) => $this->mapPostCard($post))
+        );
+
         return Inertia::render('Blog/Index', [
             'posts' => $posts,
             'categories' => $categories,
+            'wideSection' => $wideSection,
+            'clusterSection' => [
+                'left' => $clusterLeft,
+                'right' => $clusterRight,
+            ],
         ]);
     }
 
@@ -92,33 +115,25 @@ class PostController extends Controller
                 'excerpt' => $post->excerpt,
                 'published_at' => $post->published_at,
                 'featured_image_url' => $post->featured_image_url,
-
-                // Quill already stores HTML, so send it straight through
                 'content_html' => $post->content,
-
                 'sources' => $post->sources,
-
                 'category' => $post->category
                     ? [
                         'name' => $post->category->name,
                         'slug' => $post->category->slug,
                     ]
                     : null,
-
                 'tags' => $post->tags->map(fn ($tag) => [
                     'id' => $tag->id,
                     'name' => $tag->name,
                     'slug' => $tag->slug,
                 ])->values(),
-
                 'seo' => [
                     'url' => $postUrl,
                     'canonical_url' => $canonical,
                     'robots' => $robots,
-
                     'title' => $title,
                     'description' => $description,
-
                     'og' => [
                         'type' => 'article',
                         'title' => $ogTitle,
@@ -126,7 +141,6 @@ class PostController extends Controller
                         'image' => $ogImage,
                         'url' => $postUrl,
                     ],
-
                     'twitter' => [
                         'card' => 'summary_large_image',
                         'title' => $ogTitle,
@@ -208,5 +222,84 @@ class PostController extends Controller
             ],
             'posts' => $posts,
         ]);
+    }
+
+    private function buildSectionPayload(?BlogIndexSection $section, int $limit, array &$usedIds): ?array
+    {
+        if (!$section || !$section->enabled) {
+            return null;
+        }
+
+        $query = Post::query()
+            ->published()
+            ->with(['category:id,name,slug'])
+            ->orderByDesc('published_at')
+            ->select(['id', 'title', 'slug', 'excerpt', 'content', 'published_at', 'category_id', 'featured_image_path']);
+
+        if (!empty($usedIds)) {
+            $query->whereNotIn('id', $usedIds);
+        }
+
+        if ($section->source_type === BlogIndexSection::SOURCE_FEATURED) {
+            $query->where('is_featured', true);
+        } elseif ($section->source_type === BlogIndexSection::SOURCE_CATEGORY) {
+            if (!$section->category_id) {
+                return null;
+            }
+
+            $query->where('category_id', $section->category_id);
+        }
+
+        $posts = $query->limit($limit)->get();
+
+        if ($posts->isEmpty()) {
+            return null;
+        }
+
+        $usedIds = array_values(array_unique([...$usedIds, ...$posts->pluck('id')->all()]));
+
+        return [
+            'title' => $this->resolveSectionTitle($section),
+            'posts' => $posts->map(fn (Post $post) => $this->mapPostCard($post))->values()->all(),
+        ];
+    }
+
+    private function mapPostCard(Post $post): array
+    {
+        $plainContent = trim(preg_replace('/\s+/', ' ', strip_tags((string) $post->content)));
+        $cardSnippet = $post->excerpt ?: Str::limit($plainContent, 180, '…');
+
+        return [
+            'id' => $post->id,
+            'title' => $post->title,
+            'slug' => $post->slug,
+            'excerpt' => $post->excerpt,
+            'card_snippet' => $cardSnippet ?: null,
+            'published_at' => $post->published_at,
+            'featured_image_url' => $post->featured_image_url,
+            'category' => $post->category
+                ? [
+                    'name' => $post->category->name,
+                    'slug' => $post->category->slug,
+                ]
+                : null,
+        ];
+    }
+
+    private function resolveSectionTitle(BlogIndexSection $section): string
+    {
+        $override = trim((string) ($section->title_override ?? ''));
+
+        if ($override !== '') {
+            return $override;
+        }
+
+        return match ($section->source_type) {
+            BlogIndexSection::SOURCE_FEATURED => 'Featured Articles',
+            BlogIndexSection::SOURCE_CATEGORY => $section->category?->name
+                ? 'From ' . $section->category->name
+                : 'From Category',
+            default => 'Latest Articles',
+        };
     }
 }

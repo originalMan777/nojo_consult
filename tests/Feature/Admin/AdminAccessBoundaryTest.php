@@ -1,0 +1,119 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Models\LeadBox;
+use App\Models\LeadSlot;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class AdminAccessBoundaryTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_guests_are_redirected_from_admin_index_routes(): void
+    {
+        foreach ($this->adminIndexRoutes() as $route) {
+            $this->get($route)->assertRedirect(route('login'));
+        }
+    }
+
+    public function test_non_admin_users_are_forbidden_from_admin_index_routes(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+
+        foreach ($this->adminIndexRoutes() as $route) {
+            $this->actingAs($user)->get($route)->assertForbidden();
+        }
+    }
+
+    public function test_non_admin_users_are_forbidden_from_admin_write_routes(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $leadSlot = LeadSlot::factory()->create(['key' => 'home_intro']);
+
+        $this->actingAs($user)
+            ->post(route('admin.posts.store'), $this->validPostPayload())
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->post(route('admin.media.store'), [
+                'folder' => 'blog',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->post(route('admin.popups.store'), $this->validPopupPayload())
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->post(route('admin.lead-boxes.resource.store'), $this->validResourceLeadBoxPayload())
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->put(route('admin.lead-slots.update', $leadSlot), [
+                'is_enabled' => true,
+                'lead_box_id' => null,
+            ])
+            ->assertForbidden();
+    }
+
+    private function adminIndexRoutes(): array
+    {
+        return [
+            route('admin.index'),
+            route('admin.posts.index'),
+            route('admin.categories.index'),
+            route('admin.tags.index'),
+            route('admin.media.index'),
+            route('admin.lead-boxes.index'),
+            route('admin.lead-slots.index'),
+            route('admin.popups.index'),
+            route('admin.content-formula.index'),
+        ];
+    }
+
+    private function validPostPayload(): array
+    {
+        return [
+            'title' => 'Access Test Post',
+            'content' => '<p>Body</p>',
+            'sources' => 'https://example.com/source',
+            'featured_image_path' => '/images/blog/test.png',
+        ];
+    }
+
+    private function validPopupPayload(): array
+    {
+        return [
+            'name' => 'Access Popup',
+            'type' => 'general',
+            'role' => 'standard',
+            'priority' => 10,
+            'headline' => 'Access popup',
+            'cta_text' => 'Submit',
+            'layout' => 'centered',
+            'trigger_type' => 'time',
+            'device' => 'all',
+            'frequency' => 'once_day',
+            'audience' => 'guests',
+            'suppression_scope' => 'all_lead_popups',
+            'lead_type' => 'general',
+            'post_submit_action' => 'message',
+        ];
+    }
+
+    private function validResourceLeadBoxPayload(): array
+    {
+        return [
+            'status' => LeadBox::STATUS_ACTIVE,
+            'internal_name' => 'Access test resource box',
+            'title' => 'Resource box',
+            'short_text' => 'Helpful text.',
+            'button_text' => 'Get it',
+            'icon_key' => 'book-open',
+            'visual_preset' => 'default',
+        ];
+    }
+}

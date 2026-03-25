@@ -41,6 +41,7 @@ type PostDto = {
     og_description: string | null;
     og_image_path: string | null;
     noindex: boolean;
+    is_featured: boolean;
 };
 
 const props = defineProps<{
@@ -95,6 +96,7 @@ const form = useForm({
     og_description: props.post.og_description ?? '',
     og_image_path: props.post.og_image_path ?? '',
     noindex: !!props.post.noindex,
+    is_featured: !!props.post.is_featured,
     featured_image: null as File | null,
     featured_image_path: props.post.featured_image_path ?? props.post.featured_image_url ?? '',
     remove_featured_image: false,
@@ -621,6 +623,24 @@ const unpublish = () => {
 
                         <InputError :message="(form.errors as any).featured_image" class="mt-2" />
                         <InputError :message="(form.errors as any).featured_image_path" class="mt-2" />
+                    </div>
+
+                    <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div class="text-sm font-medium text-gray-900">Article Flags</div>
+                        <label class="mt-3 flex items-start gap-3">
+                            <input
+                                v-model="form.is_featured"
+                                type="checkbox"
+                                class="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                            />
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">Featured Article</div>
+                                <p class="mt-1 text-sm leading-relaxed text-gray-600">
+                                    Allow this post to appear in featured blog index sections.
+                                </p>
+                            </div>
+                        </label>
+                        <InputError :message="form.errors.is_featured" class="mt-2" />
                     </div>
                 </section>
 

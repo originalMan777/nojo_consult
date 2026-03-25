@@ -54,7 +54,7 @@ const props = defineProps<{
 
 const previewItem = ref<MediaItem | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const uploadFile = ref<File | null>(null);
+const uploadFiles = ref<File[]>([]);
 const isUploading = ref(false);
 const isDeletingPath = ref<string | null>(null);
 const notice = ref<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -85,12 +85,12 @@ const pickFile = () => {
 
 const onFileChange = (event: Event) => {
     const target = event.target as HTMLInputElement;
-    uploadFile.value = target.files?.[0] ?? null;
+    uploadFiles.value = Array.from(target.files ?? []);
 };
 
 const uploadImage = async () => {
-    if (!uploadFile.value) {
-        notice.value = { type: 'error', text: 'Choose an image first.' };
+    if (uploadFiles.value.length === 0) {
+        notice.value = { type: 'error', text: 'Choose at least one image first.' };
         resetNotice();
         return;
     }
@@ -99,20 +99,29 @@ const uploadImage = async () => {
     notice.value = null;
 
     try {
-        const form = new FormData();
-        form.append('folder', uploadFolder.value);
-        form.append('image', uploadFile.value);
+        for (const file of uploadFiles.value) {
+            const form = new FormData();
+            form.append('folder', uploadFolder.value);
+            form.append('image', file);
 
-        await axios.post(route('admin.media.store'), form, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+            await axios.post(route('admin.media.store'), form, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+        }
 
-        uploadFile.value = null;
+        notice.value = {
+            type: 'success',
+            text:
+                uploadFiles.value.length === 1
+                    ? '1 image uploaded.'
+                    : `${uploadFiles.value.length} images uploaded.`,
+        };
+
+        uploadFiles.value = [];
         if (fileInput.value) fileInput.value.value = '';
 
-        notice.value = { type: 'success', text: 'Image uploaded.' };
         resetNotice();
         applyFilters(true);
     } catch (error: any) {
@@ -325,6 +334,7 @@ const formatDate = (value: string | null) => {
                                         ref="fileInput"
                                         type="file"
                                         accept="image/*"
+                                        multiple
                                         class="hidden"
                                         @change="onFileChange"
                                     />
@@ -337,30 +347,37 @@ const formatDate = (value: string | null) => {
                                             class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                                             @click="pickFile"
                                         >
-                                            Choose file
+                                            Choose file(s)
                                         </button>
 
                                         <button
                                             type="button"
                                             class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                                             :disabled="
-                                                isUploading || !uploadFile
+                                                isUploading || uploadFiles.length === 0
                                             "
                                             @click="uploadImage"
                                         >
                                             {{
                                                 isUploading
                                                     ? 'Uploading…'
-                                                    : 'Upload'
+                                                    : uploadFiles.length > 1
+                                                      ? `Upload ${uploadFiles.length} images`
+                                                      : 'Upload image'
                                             }}
                                         </button>
                                     </div>
 
                                     <p
-                                        v-if="uploadFile"
+                                        v-if="uploadFiles.length"
                                         class="text-xs text-gray-600"
                                     >
-                                        Selected: {{ uploadFile.name }}
+                                        <template v-if="uploadFiles.length === 1">
+                                            Selected: {{ uploadFiles[0].name }}
+                                        </template>
+                                        <template v-else>
+                                            Selected: {{ uploadFiles.length }} images
+                                        </template>
                                     </p>
 
                                     <div

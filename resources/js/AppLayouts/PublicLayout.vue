@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3'
 import PublicPopupModal from '@/components/public/PublicPopupModal.vue'
+import { usePublicAuthNavigation } from '@/composables/usePublicAuthNavigation'
 import { computed, ref } from 'vue'
 
 type CategoryItem = {
@@ -24,9 +25,7 @@ const props = withDefaults(
 
 const page = usePage<any>()
 
-const user = computed(() => page.props?.auth?.user ?? null)
-const isAdmin = computed(() => Boolean(user.value?.is_admin))
-const displayName = computed(() => user.value?.name ?? user.value?.email ?? 'Account')
+const { user, displayName, dashboardHref, profileHref } = usePublicAuthNavigation()
 const categories = computed<CategoryItem[]>(() => page.props?.categories ?? [])
 
 const sidebarOpen = ref(true)
@@ -70,8 +69,15 @@ function toggleSidebar() {
               </span>
 
               <Link
-                v-if="isAdmin"
-                :href="route('dashboard')"
+                :href="profileHref"
+                class="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Profile
+              </Link>
+
+              <Link
+                v-if="dashboardHref"
+                :href="dashboardHref"
                 class="text-sm text-gray-600 hover:text-gray-900"
               >
                 Dashboard

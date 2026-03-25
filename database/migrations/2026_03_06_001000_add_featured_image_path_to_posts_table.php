@@ -8,6 +8,10 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('posts', function (Blueprint $table) {
+            if (! Schema::hasColumn('posts', 'featured_image_path')) {
+                $table->string('featured_image_path', 2048)->nullable()->after('sources');
+            }
+
             if (! Schema::hasColumn('posts', 'featured_image_alt')) {
                 $table->string('featured_image_alt')->nullable()->after('featured_image_path');
             }
@@ -27,6 +31,10 @@ return new class extends Migration {
 
             if (Schema::hasColumn('posts', 'featured_image_alt')) {
                 $table->dropColumn('featured_image_alt');
+            }
+
+            if (Schema::hasColumn('posts', 'featured_image_path')) {
+                $table->dropColumn('featured_image_path');
             }
         });
     }

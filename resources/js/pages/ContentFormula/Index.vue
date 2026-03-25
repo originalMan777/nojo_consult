@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
 import TopNavA from './TopNavA.vue';
@@ -146,6 +146,22 @@ const footerLogoVisible = reactive({
     nojo: true,
     awestruk: true,
 });
+const leftPanelHeight = ref<number | null>(null);
+const controlCenterCard = ref<HTMLElement | null>(null);
+let controlCenterResizeObserver: ResizeObserver | null = null;
+
+function syncLeftPanelHeight() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+        leftPanelHeight.value = null;
+        return;
+    }
+
+    leftPanelHeight.value = controlCenterCard.value?.offsetHeight ?? null;
+}
 
 function initializeState() {
     for (const category of props.config.categories) {
@@ -471,9 +487,36 @@ function handleFooterLogoError(key: 'nojo' | 'awestruk') {
     footerLogoVisible[key] = false;
 }
 
+onMounted(() => {
+    nextTick(() => {
+        syncLeftPanelHeight();
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', syncLeftPanelHeight);
+        }
+
+        if (typeof ResizeObserver !== 'undefined' && controlCenterCard.value) {
+            controlCenterResizeObserver = new ResizeObserver(() => {
+                syncLeftPanelHeight();
+            });
+
+            controlCenterResizeObserver.observe(controlCenterCard.value);
+        }
+    });
+});
+
 onBeforeUnmount(() => {
     if (copyFeedbackTimeout) {
         clearTimeout(copyFeedbackTimeout);
+    }
+
+    if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', syncLeftPanelHeight);
+    }
+
+    if (controlCenterResizeObserver) {
+        controlCenterResizeObserver.disconnect();
+        controlCenterResizeObserver = null;
     }
 });
 </script>
@@ -520,9 +563,12 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
-                    <div class="flex lg:col-span-8">
-                        <div class="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_18px_50px_rgba(28,25,23,0.07)]">
+                <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+                    <div class="lg:col-span-8">
+                        <div
+                            class="flex w-full flex-col overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_18px_50px_rgba(28,25,23,0.07)]"
+                            :style="leftPanelHeight ? { height: `${leftPanelHeight}px` } : undefined"
+                        >
                             <div class="border-b border-stone-200 px-6 py-5">
                                 <h2 class="text-lg font-semibold text-stone-900">Build Your Content Pool</h2>
                                 <p class="mt-1 text-sm text-stone-600">
@@ -530,7 +576,7 @@ onBeforeUnmount(() => {
                                 </p>
                             </div>
 
-                            <div class="max-h-[78vh] overflow-y-auto px-6 py-6">
+                            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
                                 <div class="space-y-6">
                                     <div
                                         v-for="category in requiredCategories"
@@ -771,7 +817,10 @@ onBeforeUnmount(() => {
 
                     <div class="flex lg:col-span-4">
                         <div class="space-y-6" :class="props.config.ui.sticky_control_center ? 'lg:sticky lg:top-6' : ''">
-                            <div class="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_18px_50px_rgba(28,25,23,0.07)]">
+                            <div
+                                ref="controlCenterCard"
+                                class="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_18px_50px_rgba(28,25,23,0.07)]"
+                            >
                                 <div class="border-b border-stone-200 px-6 py-5">
                                     <h2 class="text-lg font-semibold text-stone-900">Control Center</h2>
                                     <p class="mt-1 text-sm text-stone-600">

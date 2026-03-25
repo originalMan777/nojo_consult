@@ -496,9 +496,9 @@ return [
                 'template' => 'Draft an SEO-aware article on :topic from a :article_type angle using a :article_format format. Write for :audience_fallback, keep the tone :vibe, and ground the article in :context_fallback. Prioritize clarity, momentum, strong subheads, and useful takeaways that make the reader feel :reader_impact_lower:perspective_clause. :length_instruction:extra_direction_sentence',
             ],
             [
-                'key' => 'editorial_depth',
-                'label' => 'Editorial Depth',
-                'template' => 'Write an editorial-quality piece about :topic that explores :article_type through a :article_format presentation. Use a :vibe voice, surface nuanced insights, address objections, and deliver specific, trustworthy guidance for :audience_fallback. Close with a memorable takeaway that leaves the reader :reader_impact_lower:context_clause:perspective_clause. :length_instruction:extra_direction_sentence',
+                'key' => 'seo_optimized',
+                'label' => 'SEO Optimized',
+                'template' => 'Create a complete SEO-optimized blog article package about :topic from a :article_type angle using a :article_format format. Write for :audience_fallback, keep the tone :vibe, and ground the piece in :context_fallback. Prioritize clarity, momentum, strong subheads, and practical takeaways that leave the reader :reader_impact_lower:perspective_clause. Write the article first. After the article, output a separate field list. Format exactly like this: SEO Title: Slug: Excerpt: Sources: Category: Tags: Meta Title: Meta Description: Canonical URL: OG Title: OG Description: Featured Image Path: OG Image Path: Noindex: Rules: - Do not blend these fields into the article. - Do not explain the fields. - Do not add commentary. - Article first. - Field list second. :length_instruction:extra_direction_sentence',
             ],
         ],
     ],

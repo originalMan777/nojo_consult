@@ -76,6 +76,7 @@ class PostController extends Controller
     {
         $validated = $this->validatePost($request);
         $validated['noindex'] = (bool) ($validated['noindex'] ?? false);
+        $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
 
         $tagIds = Arr::pull($validated, 'tag_ids', []);
         $newTags = Arr::pull($validated, 'new_tags', []);
@@ -185,13 +186,11 @@ class PostController extends Controller
                 'sources' => $post->sources,
                 'category_id' => $post->category_id,
                 'tag_ids' => $post->tags()->pluck('tags.id')->all(),
-
+                'is_featured' => (bool) $post->is_featured,
                 'featured_image_path' => $post->featured_image_path,
                 'featured_image_url' => $featuredImageUrl,
-
                 'status' => $post->status,
                 'published_at' => $post->published_at,
-
                 'meta_title' => $post->meta_title,
                 'meta_description' => $post->meta_description,
                 'canonical_url' => $post->canonical_url,
@@ -209,6 +208,7 @@ class PostController extends Controller
     {
         $validated = $this->validatePost($request);
         $validated['noindex'] = (bool) ($validated['noindex'] ?? false);
+        $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
 
         $tagIds = Arr::pull($validated, 'tag_ids', []);
         $newTags = Arr::pull($validated, 'new_tags', []);
@@ -296,35 +296,37 @@ class PostController extends Controller
         return redirect()->route('admin.posts.edit', $post);
     }
 
+    public function destroy(Post $post)
+    {
+        $post->delete();
+
+        return redirect()
+            ->route('admin.posts.index')
+            ->with('success', 'Post deleted.');
+    }
+
     private function validatePost(Request $request): array
     {
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-
             'excerpt' => ['nullable', 'string'],
             'content' => ['required', 'string'],
             'sources' => ['nullable', 'string'],
-
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'new_category' => ['nullable', 'string', 'max:255'],
-
             'new_tags' => ['nullable', 'array'],
             'new_tags.*' => ['string', 'max:255'],
-
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string'],
-
             'canonical_url' => ['nullable', 'string', 'max:2048'],
             'og_title' => ['nullable', 'string', 'max:255'],
             'og_description' => ['nullable', 'string'],
             'og_image_path' => ['nullable', 'string', 'max:2048'],
-
             'noindex' => ['sometimes', 'boolean'],
-
+            'is_featured' => ['sometimes', 'boolean'],
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => ['integer', 'exists:tags,id'],
-
             'featured_image' => ['nullable', 'image', 'max:8192'],
             'featured_image_path' => [
                 'nullable',
@@ -349,89 +351,59 @@ class PostController extends Controller
         }
 
         $existing = Post::query()
-            ->when($ignoreId !== null, fn ($q) => $q->whereKeyNot($ignoreId))
-            ->where(fn ($q) => $q->where('slug', $base)->orWhere('slug', 'like', $base . '-%'))
-            ->pluck('slug')
-            ->all();
+            ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
+            ->where('slug', 'like', $base . '%')
+            ->pluck('slug');
 
-        if (!in_array($base, $existing, true)) {
+        if (!$existing->contains($base)) {
             return $base;
         }
 
-        $i = 2;
+        $counter = 2;
 
-        while (in_array($base . '-' . $i, $existing, true)) {
-            $i++;
-        }
+        do {
+            $candidate = $base . '-' . $counter;
+            $counter++;
+        } while ($existing->contains($candidate));
 
-        return $base . '-' . $i;
+        return $candidate;
     }
 
     private function storeImageInBlogLibrary(UploadedFile $file, string $baseName): string
     {
-        $dir = public_path('images/blog');
+        $directory = public_path('images/blog');
 
-        if (!File::isDirectory($dir)) {
-            File::makeDirectory($dir, 0755, true);
+        if (!File::isDirectory($directory)) {
+            File::makeDirectory($directory, 0755, true);
         }
 
-        $base = Str::slug($baseName);
-
-        if ($base === '') {
-            $base = 'image';
-        }
-
-        $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg');
-
-        if ($extension === '') {
-            $extension = 'jpg';
-        }
-
-        $filename = $base . '.' . $extension;
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        $filename = Str::slug($baseName) ?: 'post-image';
+        $candidate = $filename . '.' . $extension;
         $counter = 2;
 
-        while (File::exists($dir . DIRECTORY_SEPARATOR . $filename)) {
-            $filename = $base . '-' . $counter . '.' . $extension;
+        while (File::exists($directory . DIRECTORY_SEPARATOR . $candidate)) {
+            $candidate = $filename . '-' . $counter . '.' . $extension;
             $counter++;
         }
 
-        $file->move($dir, $filename);
+        $file->move($directory, $candidate);
 
-        return '/images/blog/' . $filename;
+        return '/images/blog/' . $candidate;
     }
 
-        private function resolveMediaUrl(?string $path): ?string
-{
-    if (!$path) {
-        return null;
+    private function resolveMediaUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $path = trim($path);
+
+        if (Str::startsWith($path, ['http://', 'https://', '/'])) {
+            return $path;
+        }
+
+        return Storage::disk('public')->url($path);
     }
-
-    $path = trim($path);
-
-    if (Str::startsWith($path, ['http://', 'https://'])) {
-        return $path;
-    }
-
-    if (Str::startsWith($path, '/storage/images/')) {
-        return Str::replaceFirst('/storage/images/', '/images/', $path);
-    }
-
-    if (Str::startsWith($path, 'storage/images/')) {
-        return '/' . Str::replaceFirst('storage/images/', 'images/', ltrim($path, '/'));
-    }
-
-    if (Str::startsWith($path, '/images/')) {
-        return $path;
-    }
-
-    if (Str::startsWith($path, 'images/')) {
-        return '/' . ltrim($path, '/');
-    }
-
-    if (Str::startsWith($path, '/storage/')) {
-        return $path;
-    }
-
-    return Storage::disk('public')->url($path);
-}
 }

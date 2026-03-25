@@ -68,7 +68,7 @@ const selectedItem = computed<MediaItem | null>(() => {
 
 const previewItem = ref<MediaItem | null>(null);
 const uploadInputRef = ref<HTMLInputElement | null>(null);
-const uploadFile = ref<File | null>(null);
+const uploadFiles = ref<File[]>([]);
 
 const formattedRange = computed(() => {
     if (total.value > 0) {
@@ -268,12 +268,12 @@ const applySearch = () => {
 
 const onUploadFileChange = (event: Event) => {
     const input = event.target as HTMLInputElement;
-    uploadFile.value = input.files?.[0] ?? null;
+    uploadFiles.value = Array.from(input.files ?? []);
 };
 
 const uploadImage = async () => {
-    if (!uploadFile.value) {
-        errorMessage.value = 'Choose an image first.';
+    if (uploadFiles.value.length === 0) {
+        errorMessage.value = 'Choose at least one image first.';
         successMessage.value = '';
         return;
     }
@@ -282,44 +282,50 @@ const uploadImage = async () => {
     clearMessages();
 
     try {
-        const formData = new FormData();
-        formData.append('folder', uploadFolder.value);
-        formData.append('image', uploadFile.value);
+        let lastUploadedPath: string | null = null;
 
-        const response = await fetch(route('admin.media.store'), {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-XSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: formData,
-        });
+        for (const file of uploadFiles.value) {
+            const formData = new FormData();
+            formData.append('folder', uploadFolder.value);
+            formData.append('image', file);
 
-        const payload = await response.json().catch(() => ({}));
+            const response = await fetch(route('admin.media.store'), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-XSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            });
 
-        if (!response.ok) {
-            throw new Error(payload.message || 'Failed to upload image.');
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload.message || `Failed to upload ${file.name}.`);
+            }
+
+            lastUploadedPath = payload.item?.path ?? lastUploadedPath;
         }
 
-        successMessage.value = payload.message || 'Image uploaded.';
+        successMessage.value =
+            uploadFiles.value.length === 1
+                ? '1 image uploaded.'
+                : `${uploadFiles.value.length} images uploaded.`;
         folder.value = uploadFolder.value;
         await loadMedia(1, false);
 
-        if (payload.item?.path) {
+        if (lastUploadedPath) {
             const uploadedItem =
-                items.value.find((item) => item.path === payload.item.path) ??
-                ({
-                    ...payload.item,
-                    extension: payload.item.extension ?? '',
-                } as MediaItem);
+                items.value.find((item) => item.path === lastUploadedPath) ??
+                null;
 
             previewItem.value = uploadedItem;
         }
 
-        uploadFile.value = null;
+        uploadFiles.value = [];
 
         if (uploadInputRef.value) {
             uploadInputRef.value.value = '';
@@ -573,6 +579,7 @@ watch(perPage, () => {
                                                 ref="uploadInputRef"
                                                 type="file"
                                                 accept="image/*"
+                                                multiple
                                                 class="hidden"
                                                 @change="onUploadFileChange"
                                             />
@@ -585,30 +592,37 @@ watch(perPage, () => {
                                                     class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                                                     @click="openUploadPicker"
                                                 >
-                                                    Choose file
+                                                    Choose file(s)
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                                                     :disabled="
-                                                        uploading || !uploadFile
+                                                        uploading || uploadFiles.length === 0
                                                     "
                                                     @click="uploadImage"
                                                 >
                                                     {{
                                                         uploading
                                                             ? 'Uploading…'
-                                                            : 'Upload'
+                                                            : uploadFiles.length > 1
+                                                              ? `Upload ${uploadFiles.length} images`
+                                                              : 'Upload image'
                                                     }}
                                                 </button>
                                             </div>
 
                                             <p
-                                                v-if="uploadFile"
+                                                v-if="uploadFiles.length"
                                                 class="text-xs text-gray-600"
                                             >
-                                                Selected: {{ uploadFile.name }}
+                                                <template v-if="uploadFiles.length === 1">
+                                                    Selected: {{ uploadFiles[0].name }}
+                                                </template>
+                                                <template v-else>
+                                                    Selected: {{ uploadFiles.length }} images
+                                                </template>
                                             </p>
 
                                             <div

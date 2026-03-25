@@ -16,16 +16,27 @@ class DashboardTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    public function test_regular_users_are_redirected_to_the_profile_hub_from_dashboard(): void
+    public function test_regular_users_cannot_access_the_dashboard_route(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get(route('dashboard'))
-            ->assertRedirect(route('profile', absolute: false));
+            ->assertForbidden();
     }
 
-    public function test_admin_users_are_redirected_to_the_profile_hub_from_dashboard(): void
+    public function test_unverified_admin_users_are_redirected_to_the_verification_notice(): void
+    {
+        $admin = User::factory()->unverified()->create([
+            'is_admin' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('verification.notice', absolute: false));
+    }
+
+    public function test_verified_admin_users_are_redirected_to_the_admin_dashboard_from_dashboard(): void
     {
         $admin = User::factory()->create([
             'is_admin' => true,
@@ -33,6 +44,6 @@ class DashboardTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('dashboard'))
-            ->assertRedirect(route('profile', absolute: false));
+            ->assertRedirect(route('admin.index', absolute: false));
     }
 }

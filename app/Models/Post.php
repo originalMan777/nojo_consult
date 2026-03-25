@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class Post extends Model
 {
+    use HasFactory;
+
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PUBLISHED = 'published';
 
@@ -21,6 +24,7 @@ class Post extends Model
         'content',
         'sources',
         'featured_image_path',
+        'is_featured',
         'status',
         'published_at',
         'meta_title',
@@ -37,6 +41,7 @@ class Post extends Model
 
     protected $casts = [
         'published_at' => 'datetime',
+        'is_featured' => 'boolean',
         'noindex' => 'boolean',
     ];
 

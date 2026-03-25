@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LeadBox extends Model
 {
+    use HasFactory;
+
     public const TYPE_RESOURCE = 'resource';
     public const TYPE_SERVICE = 'service';
     public const TYPE_OFFER = 'offer';

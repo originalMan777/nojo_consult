@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
 import {
     House,
     LayoutDashboard,
-    LockKeyhole,
     Mail,
     Newspaper,
     Palette,
@@ -18,21 +16,21 @@ import {
     Images,
     PanelsTopLeft,
 } from 'lucide-vue-next';
+import { computed } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/DeleteUser.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import { usePublicAuthNavigation } from '@/composables/usePublicAuthNavigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
-import SettingsLayout from '@/layouts/settings/Layout.vue';
+import FrontLayout from '@/layouts/FrontLayout.vue';
 import admin from '@/routes/admin';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { send } from '@/routes/verification';
-import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     mustVerifyEmail: boolean;
@@ -41,17 +39,11 @@ type Props = {
 
 defineProps<Props>();
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Profile',
-        href: editProfile(),
-    },
-];
-
 const page = usePage<any>();
-const user = computed(() => page.props.auth.user);
-const isAdmin = computed(() => Boolean(user.value?.is_admin));
-const roleLabel = computed(() => (isAdmin.value ? 'Admin account' : 'User account'));
+const { user, hasAdminWorkspace, isAdmin } = usePublicAuthNavigation();
+const roleLabel = computed(() =>
+    isAdmin.value ? 'Admin account' : 'User account',
+);
 
 const userLinks = computed(() => [
     {
@@ -145,149 +137,240 @@ const adminLinks = computed(() => [
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbItems">
+    <FrontLayout>
         <Head title="Profile" />
 
         <h1 class="sr-only">Profile</h1>
 
-        <SettingsLayout>
-            <div class="flex flex-col space-y-8">
-                <div class="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
-                    <div class="border-b border-border/70 bg-muted/40 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <div class="mx-auto flex max-w-5xl flex-col space-y-8">
+            <div
+                class="rounded-3xl border border-black/5 bg-white/90 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.08)]"
+            >
+                <div
+                    class="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm"
+                >
+                    <div
+                        class="border-b border-border/70 bg-muted/40 px-6 py-5"
+                    >
+                        <p
+                            class="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase"
+                        >
                             Welcome back
                         </p>
-                        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div
+                            class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+                        >
                             <div>
-                                <h2 class="text-2xl font-semibold tracking-tight text-foreground">
+                                <h2
+                                    class="text-2xl font-semibold tracking-tight text-foreground"
+                                >
                                     {{ user.name }}
                                 </h2>
                                 <p class="mt-1 text-sm text-muted-foreground">
-                                    This is your account home after login. Use the links below to move through your user tools,
-                                    and if you are an admin, your admin controls will appear separately.
+                                    This is your account home after login. Use
+                                    the links below to move through your user
+                                    tools, and if you are an admin, your admin
+                                    controls will appear separately.
                                 </p>
                             </div>
 
-                            <div class="inline-flex w-fit items-center rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground">
+                            <div
+                                class="inline-flex w-fit items-center rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground"
+                            >
                                 {{ roleLabel }}
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid gap-0 border-t border-border/70 md:grid-cols-[1.2fr_0.8fr] md:border-t-0">
+                    <div
+                        class="grid gap-0 border-t border-border/70 md:grid-cols-[1.2fr_0.8fr] md:border-t-0"
+                    >
                         <div class="px-6 py-5 md:border-r md:border-border/70">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <p
+                                class="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+                            >
                                 Account snapshot
                             </p>
                             <dl class="mt-4 space-y-3 text-sm">
-                                <div class="flex items-start justify-between gap-4">
+                                <div
+                                    class="flex items-start justify-between gap-4"
+                                >
                                     <dt class="text-muted-foreground">Name</dt>
-                                    <dd class="text-right font-medium text-foreground">{{ user.name }}</dd>
+                                    <dd
+                                        class="text-right font-medium text-foreground"
+                                    >
+                                        {{ user.name }}
+                                    </dd>
                                 </div>
-                                <div class="flex items-start justify-between gap-4">
+                                <div
+                                    class="flex items-start justify-between gap-4"
+                                >
                                     <dt class="text-muted-foreground">Email</dt>
-                                    <dd class="text-right font-medium text-foreground">{{ user.email }}</dd>
+                                    <dd
+                                        class="text-right font-medium text-foreground"
+                                    >
+                                        {{ user.email }}
+                                    </dd>
                                 </div>
-                                <div class="flex items-start justify-between gap-4">
-                                    <dt class="text-muted-foreground">Email status</dt>
-                                    <dd class="text-right font-medium text-foreground">
-                                        {{ user.email_verified_at ? 'Verified' : 'Unverified' }}
+                                <div
+                                    class="flex items-start justify-between gap-4"
+                                >
+                                    <dt class="text-muted-foreground">
+                                        Email status
+                                    </dt>
+                                    <dd
+                                        class="text-right font-medium text-foreground"
+                                    >
+                                        {{
+                                            user.email_verified_at
+                                                ? 'Verified'
+                                                : 'Unverified'
+                                        }}
                                     </dd>
                                 </div>
                             </dl>
                         </div>
 
                         <div class="px-6 py-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <p
+                                class="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+                            >
                                 What this page is for
                             </p>
-                            <p class="mt-4 text-sm leading-6 text-muted-foreground">
-                                This profile page acts as your post-login hub. User links stay separate from admin links so the
-                                account side and the management side do not feel mixed together.
+                            <p
+                                class="mt-4 text-sm leading-6 text-muted-foreground"
+                            >
+                                This profile page acts as your post-login hub.
+                                User links stay separate from admin links so the
+                                account side and the management side do not feel
+                                mixed together.
                             </p>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="space-y-4">
-                    <div>
-                        <Heading
-                            variant="small"
-                            title="User links"
-                            description="These links are for the normal account side of the site."
-                        />
+            <div class="space-y-4">
+                <div>
+                    <Heading
+                        variant="small"
+                        title="User links"
+                        description="These links are for the normal account side of the site."
+                    />
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <Link
+                        v-for="item in userLinks"
+                        :key="
+                            typeof item.href === 'string'
+                                ? item.href
+                                : item.href.url
+                        "
+                        :href="item.href"
+                        class="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="rounded-2xl border border-border/70 bg-muted/50 p-2.5 text-muted-foreground transition group-hover:text-foreground"
+                            >
+                                <component :is="item.icon" class="h-5 w-5" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3
+                                    class="text-sm font-semibold text-foreground"
+                                >
+                                    {{ item.title }}
+                                </h3>
+                                <p
+                                    class="mt-1 text-sm leading-6 text-muted-foreground"
+                                >
+                                    {{ item.description }}
+                                </p>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+            </div>
+
+            <div v-if="hasAdminWorkspace" class="space-y-4">
+                <div>
+                    <Heading
+                        variant="small"
+                        title="Admin links"
+                        description="These links are only for admin users and stay separated from the normal user side."
+                    />
+                </div>
+
+                <div
+                    class="overflow-hidden rounded-3xl border border-primary/15 bg-primary/5 p-5 shadow-sm"
+                >
+                    <div
+                        class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+                    >
+                        <div>
+                            <p
+                                class="text-xs font-semibold tracking-[0.18em] text-primary/80 uppercase"
+                            >
+                                Admin workspace
+                            </p>
+                            <p
+                                class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground"
+                            >
+                                Your admin tools are available from this hub
+                                first, but they remain protected behind the
+                                existing admin routes and middleware.
+                            </p>
+                        </div>
+
+                        <div
+                            class="inline-flex w-fit items-center rounded-full border border-primary/20 bg-background px-3 py-1.5 text-sm font-medium text-foreground"
+                        >
+                            Admin access enabled
+                        </div>
                     </div>
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <Link
-                            v-for="item in userLinks"
-                            :key="typeof item.href === 'string' ? item.href : item.href.url"
-                            :href="item.href"
-                            class="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-                        >
-                            <div class="flex items-start gap-3">
-                                <div class="rounded-2xl border border-border/70 bg-muted/50 p-2.5 text-muted-foreground transition group-hover:text-foreground">
-                                    <component :is="item.icon" class="h-5 w-5" />
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-sm font-semibold text-foreground">{{ item.title }}</h3>
-                                    <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                                        {{ item.description }}
-                                    </p>
-                                </div>
-                            </div>
-                        </Link>
-                    </div>
-                </div>
-
-                <div v-if="isAdmin" class="space-y-4">
-                    <div>
-                        <Heading
-                            variant="small"
-                            title="Admin links"
-                            description="These links are only for admin users and stay separated from the normal user side."
-                        />
-                    </div>
-
-                    <div class="overflow-hidden rounded-3xl border border-primary/15 bg-primary/5 p-5 shadow-sm">
-                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
-                                    Admin workspace
-                                </p>
-                                <p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                                    Your admin tools are available from this hub first, but they remain protected behind the existing admin routes and middleware.
-                                </p>
-                            </div>
-
-                            <div class="inline-flex w-fit items-center rounded-full border border-primary/20 bg-background px-3 py-1.5 text-sm font-medium text-foreground">
-                                Admin access enabled
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                        <Link
                             v-for="item in adminLinks"
-                            :key="typeof item.href === 'string' ? item.href : item.href.url"
+                            :key="
+                                typeof item.href === 'string'
+                                    ? item.href
+                                    : item.href.url
+                            "
                             :href="item.href"
                             class="group rounded-3xl border border-primary/15 bg-background p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
                         >
                             <div class="flex items-start gap-3">
-                                <div class="rounded-2xl border border-primary/10 bg-primary/10 p-3 text-primary transition group-hover:scale-[1.02] group-hover:text-primary">
-                                    <component :is="item.icon" class="h-6 w-6" />
+                                <div
+                                    class="rounded-2xl border border-primary/10 bg-primary/10 p-3 text-primary transition group-hover:scale-[1.02] group-hover:text-primary"
+                                >
+                                    <component
+                                        :is="item.icon"
+                                        class="h-6 w-6"
+                                    />
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <h3 class="text-base font-semibold text-foreground">{{ item.title }}</h3>
-                                    <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                                    <h3
+                                        class="text-base font-semibold text-foreground"
+                                    >
+                                        {{ item.title }}
+                                    </h3>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-muted-foreground"
+                                    >
                                         {{ item.description }}
                                     </p>
                                 </div>
                             </div>
                         </Link>
-                        </div>
                     </div>
                 </div>
+            </div>
 
+            <div
+                class="rounded-3xl border border-border/70 bg-card p-6 shadow-sm"
+            >
                 <div class="flex flex-col space-y-6">
                     <Heading
                         variant="small"
@@ -345,12 +428,16 @@ const adminLinks = computed(() => [
                                 v-if="status === 'verification-link-sent'"
                                 class="mt-2 text-sm font-medium text-green-600"
                             >
-                                A new verification link has been sent to your email address.
+                                A new verification link has been sent to your
+                                email address.
                             </div>
                         </div>
 
                         <div class="flex items-center gap-4">
-                            <Button :disabled="processing" data-test="update-profile-button">
+                            <Button
+                                :disabled="processing"
+                                data-test="update-profile-button"
+                            >
                                 Save
                             </Button>
 
@@ -360,7 +447,10 @@ const adminLinks = computed(() => [
                                 leave-active-class="transition ease-in-out"
                                 leave-to-class="opacity-0"
                             >
-                                <p v-show="recentlySuccessful" class="text-sm text-neutral-600">
+                                <p
+                                    v-show="recentlySuccessful"
+                                    class="text-sm text-neutral-600"
+                                >
                                     Saved.
                                 </p>
                             </Transition>
@@ -369,7 +459,11 @@ const adminLinks = computed(() => [
                 </div>
             </div>
 
-            <DeleteUser />
-        </SettingsLayout>
-    </AppLayout>
+            <div
+                class="rounded-3xl border border-border/70 bg-card p-6 shadow-sm"
+            >
+                <DeleteUser />
+            </div>
+        </div>
+    </FrontLayout>
 </template>

@@ -28,6 +28,12 @@ const sections = [
         action: 'Open Media',
     },
     {
+        title: 'Blog Index Sections',
+        description: 'Control the fixed wide and cluster sections on the public blog index.',
+        href: route('admin.blog-index-sections.index'),
+        action: 'Open Sections',
+    },
+    {
         title: 'Popups',
         description: 'Control popup content, triggers, targeting, and lead capture.',
         href: route('admin.popups.index'),
