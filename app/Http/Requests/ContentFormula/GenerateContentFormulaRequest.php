@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\ContentFormula;
 
+use App\Services\ContentFormula\ContentFormulaRules;
 use App\Services\ContentFormula\ContentFormulaSessionService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class GenerateContentFormulaRequest extends FormRequest
@@ -15,26 +17,28 @@ class GenerateContentFormulaRequest extends FormRequest
 
     public function rules(): array
     {
+        $contentFormulaRules = app(ContentFormulaRules::class);
         $wordMin = (int) config('content_formula.generator.word_range.min', 0);
         $wordMax = (int) config('content_formula.generator.word_range.max', 2000);
+        $maxSelectionsPerGroup = $contentFormulaRules->maxSelectionsPerGroup();
 
         return [
             'action' => ['nullable', 'string', 'in:generate,continue,reset'],
             'session_id' => ['nullable', 'string', 'max:100'],
-            'result_count' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('content_formula.generator.max_result_count', 50)],
+            'result_count' => ['nullable', 'integer', Rule::in($contentFormulaRules->allowedResultCounts())],
             'min_words' => ['nullable', 'integer', 'min:' . $wordMin, 'max:' . $wordMax],
             'max_words' => ['nullable', 'integer', 'min:' . $wordMin, 'max:' . $wordMax],
             'groups' => ['required', 'array'],
 
-            'groups.topics' => ['required', 'array', 'min:1'],
-            'groups.article_types' => ['required', 'array', 'min:1'],
-            'groups.article_formats' => ['required', 'array', 'min:1'],
-            'groups.vibes' => ['required', 'array', 'min:1'],
+            'groups.topics' => ['required', 'array', 'min:1', 'max:' . $maxSelectionsPerGroup],
+            'groups.article_types' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
+            'groups.article_formats' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
+            'groups.vibes' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
 
-            'groups.reader_impacts' => ['nullable', 'array'],
-            'groups.audiences' => ['nullable', 'array'],
-            'groups.contexts' => ['nullable', 'array'],
-            'groups.perspectives' => ['nullable', 'array'],
+            'groups.reader_impacts' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
+            'groups.audiences' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
+            'groups.contexts' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
+            'groups.perspectives' => ['nullable', 'array', 'max:' . $maxSelectionsPerGroup],
 
             'groups.topics.*.label' => ['required', 'string', 'max:255'],
             'groups.article_types.*.label' => ['required', 'string', 'max:255'],
@@ -63,21 +67,25 @@ class GenerateContentFormulaRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'result_count.in' => 'Please choose 25, 50, 100, or 150 variations.',
             'groups.required' => 'The content formula groups are required.',
             'groups.topics.required' => 'Please select at least one topic.',
             'groups.topics.min' => 'Please select at least one topic.',
-            'groups.article_types.required' => 'Please select at least one type of article.',
-            'groups.article_types.min' => 'Please select at least one type of article.',
-            'groups.article_formats.required' => 'Please select at least one article format.',
-            'groups.article_formats.min' => 'Please select at least one article format.',
-            'groups.vibes.required' => 'Please select at least one vibe.',
-            'groups.vibes.min' => 'Please select at least one vibe.',
+            'groups.topics.max' => 'You can select up to 20 topics.',
+            'groups.article_types.max' => 'You can select up to 20 article types.',
+            'groups.article_formats.max' => 'You can select up to 20 formats.',
+            'groups.vibes.max' => 'You can select up to 20 vibes.',
+            'groups.reader_impacts.max' => 'You can select up to 20 reader impacts.',
+            'groups.audiences.max' => 'You can select up to 20 audiences.',
+            'groups.contexts.max' => 'You can select up to 20 contexts.',
+            'groups.perspectives.max' => 'You can select up to 20 perspectives.',
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            $contentFormulaRules = app(ContentFormulaRules::class);
             $groups = $this->input('groups', []);
             $requiredGroups = (array) config('content_formula.generator.required_groups', []);
             $action = $this->action();
@@ -126,6 +134,21 @@ class GenerateContentFormulaRequest extends FormRequest
                     $this->validateGroupItem($validator, $optionalGroup, $index, $item, false);
                 }
             }
+
+            $knownGroupKeys = $contentFormulaRules->trackedCombinationGroups();
+
+            $activeGroupCount = collect($knownGroupKeys)
+                ->filter(fn (string $groupKey) => count($groups[$groupKey] ?? []) > 0)
+                ->count();
+
+            if ($activeGroupCount > $contentFormulaRules->maxActiveGroups()) {
+                $validator->errors()->add('groups', 'You can use up to 10 categories at a time.');
+            }
+
+            if (in_array($action, ['generate', 'reset'], true)
+                && !$contentFormulaRules->meetsUnlockThreshold($groups, $knownGroupKeys)) {
+                $validator->errors()->add('groups', 'Select fields. Reach 1,000 combinations to proceed.');
+            }
         });
     }
 
@@ -150,7 +173,9 @@ class GenerateContentFormulaRequest extends FormRequest
             [$minWords, $maxWords] = [$maxWords, $minWords];
         }
 
-        $resultCount = (int) ($this->input('result_count') ?: config('content_formula.generator.default_result_count', 50));
+        $resultCount = app(ContentFormulaRules::class)->normalizeResultCount(
+            $this->filled('result_count') ? (int) $this->input('result_count') : null
+        );
 
         return [
             'action' => $this->action(),

@@ -38,7 +38,7 @@ const currentYear = new Date().getFullYear();
                     <p
                         class="max-w-2xl text-sm leading-7 text-gray-600 sm:text-base"
                     >
-                        Nojo helps buyers, sellers, and clients move with more
+                        ______ helps buyers, sellers, and clients move with more
                         clarity through practical insight, focused strategy, and
                         grounded next steps.
                     </p>

@@ -12,9 +12,7 @@ export function usePublicAuthNavigation() {
     const isAdmin = computed(() => Boolean(user.value?.is_admin));
     const hasAdminWorkspace = computed(() => isAdmin.value);
     const profileHref = computed(() => route('profile.edit'));
-    const dashboardHref = computed(() =>
-        hasAdminWorkspace.value ? route('dashboard') : null,
-    );
+    const dashboardHref = computed(() => route('dashboard'));
 
     return {
         user,

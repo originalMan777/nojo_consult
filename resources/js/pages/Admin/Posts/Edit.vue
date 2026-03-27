@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import AdminLayout from '@/AppLayouts/AdminLayout.vue';
@@ -19,6 +19,16 @@ type OptionRow = {
     id: number;
     name: string;
     slug: string;
+};
+
+type PostNavigatorItem = {
+    id: number;
+    title: string | null;
+};
+
+type PostNavigator = {
+    previous: PostNavigatorItem | null;
+    next: PostNavigatorItem | null;
 };
 
 type PostDto = {
@@ -48,6 +58,7 @@ const props = defineProps<{
     post: PostDto;
     categories: OptionRow[];
     tags: OptionRow[];
+    navigator: PostNavigator;
 }>();
 
 const page = usePage<any>();
@@ -78,6 +89,116 @@ const tagSearch = ref('');
 const QUICK_PICK_LIMIT = 6;
 const showMoreCategories = ref(false);
 const showMoreTags = ref(false);
+const sectionIds = ['content', 'media', 'taxonomy', 'seo'] as const;
+type SectionId = (typeof sectionIds)[number];
+const activeSection = ref<SectionId>('content');
+let sectionObserver: IntersectionObserver | null = null;
+const hasMounted = ref(false);
+const baselineState = ref('');
+
+const normalizeSection = (value: string | null | undefined): SectionId => {
+    if (value && sectionIds.includes(value as SectionId)) {
+        return value as SectionId;
+    }
+
+    return 'content';
+};
+
+const readSectionFromUrl = (): SectionId => {
+    return 'content';
+};
+
+const persistActiveSection = (section: SectionId) => {
+    activeSection.value = section;
+};
+
+const scrollToSection = (section: SectionId) => {
+    nextTick(() => {
+        const target = document.getElementById(`post-section-${section}`);
+        target?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+};
+
+const setupSectionObserver = () => {
+    if (typeof window === 'undefined') return;
+
+    sectionObserver?.disconnect();
+
+    const elements = sectionIds
+        .map((section) => document.getElementById(`post-section-${section}`))
+        .filter((element): element is HTMLElement => element instanceof HTMLElement);
+
+    if (!elements.length) return;
+
+    sectionObserver = new IntersectionObserver(
+        (entries) => {
+            const visibleEntries = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+            const visible = visibleEntries[0];
+            const section = visible?.target.getAttribute('data-post-section');
+
+            if (section) {
+                persistActiveSection(normalizeSection(section));
+            }
+        },
+        {
+            rootMargin: '-120px 0px -55% 0px',
+            threshold: [0.15, 0.35, 0.6],
+        },
+    );
+
+    elements.forEach((element) => sectionObserver?.observe(element));
+};
+
+const navigateToPost = (postId: number) => {
+    if (hasUnsavedChanges.value && !confirm('You have unsaved changes. Are you sure you want to leave this post?')) {
+        return;
+    }
+
+    router.visit(route('admin.posts.edit', { post: postId }));
+};
+
+
+const normalizeHtmlForDirtyCheck = (value: string | null | undefined) => {
+    return (value ?? '')
+        .replace(/>\s+</g, '><')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
+const buildDirtySnapshot = () => {
+    return JSON.stringify({
+        title: form.title ?? '',
+        slug: form.slug ?? '',
+        excerpt: form.excerpt ?? '',
+        content: normalizeHtmlForDirtyCheck(form.content),
+        sources: form.sources ?? '',
+        category_id: form.category_id ?? null,
+        tag_ids: [...(form.tag_ids ?? [])].sort((a, b) => a - b),
+        meta_title: form.meta_title ?? '',
+        meta_description: form.meta_description ?? '',
+        canonical_url: form.canonical_url ?? '',
+        og_title: form.og_title ?? '',
+        og_description: form.og_description ?? '',
+        og_image_path: form.og_image_path ?? '',
+        noindex: !!form.noindex,
+        is_featured: !!form.is_featured,
+        featured_image_path: form.featured_image_path ?? '',
+        remove_featured_image: !!form.remove_featured_image,
+        has_new_featured_image_file: !!form.featured_image,
+    });
+};
+
+const captureBaselineState = () => {
+    baselineState.value = buildDirtySnapshot();
+};
+
+const hasUnsavedChanges = computed(() => {
+    if (!hasMounted.value) return false;
+    return buildDirtySnapshot() !== baselineState.value;
+});
 
 const form = useForm({
     title: props.post.title ?? '',
@@ -217,6 +338,9 @@ const selectOverflowTag = (event: Event) => {
 };
 
 const setPreview = (file: File | null) => {
+    sectionObserver?.disconnect();
+    sectionObserver = null;
+
     if (featuredImagePreviewUrl.value) {
         URL.revokeObjectURL(featuredImagePreviewUrl.value);
         featuredImagePreviewUrl.value = null;
@@ -358,13 +482,14 @@ const createCategoryNow = async () => {
 };
 
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-    if (!form.isDirty) return;
+    if (!hasUnsavedChanges.value) return;
     e.preventDefault();
     e.returnValue = '';
 };
 
 onMounted(() => {
     window.addEventListener('beforeunload', beforeUnloadHandler);
+    persistActiveSection(readSectionFromUrl());
 
     if (editorContainerRef.value) {
         quillEditorRef.value = new Quill(editorContainerRef.value, {
@@ -386,11 +511,22 @@ onMounted(() => {
             form.content = quillEditorRef.value?.root.innerHTML || '';
         });
     }
+
+    setupSectionObserver();
+    scrollToSection(activeSection.value);
+
+    nextTick(() => {
+        captureBaselineState();
+        hasMounted.value = true;
+    });
 });
 
 onBeforeUnmount(() => {
     quillEditorRef.value = null;
     window.removeEventListener('beforeunload', beforeUnloadHandler);
+
+    sectionObserver?.disconnect();
+    sectionObserver = null;
 
     if (featuredImagePreviewUrl.value) {
         URL.revokeObjectURL(featuredImagePreviewUrl.value);
@@ -399,7 +535,7 @@ onBeforeUnmount(() => {
 });
 
 const backToPosts = () => {
-    if (form.isDirty && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
+    if (hasUnsavedChanges.value && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
         return;
     }
 
@@ -407,8 +543,11 @@ const backToPosts = () => {
 };
 
 const save = () => {
+    persistActiveSection(activeSection.value);
+
     form.put(route('admin.posts.update', props.post.id), {
         forceFormData: true,
+        preserveScroll: true,
     });
 };
 
@@ -416,6 +555,8 @@ const publishing = ref(false);
 
 const publish = () => {
     publishing.value = true;
+
+    persistActiveSection(activeSection.value);
 
     router.post(
         route('admin.posts.publish', props.post.id),
@@ -431,6 +572,8 @@ const publish = () => {
 
 const unpublish = () => {
     publishing.value = true;
+
+    persistActiveSection(activeSection.value);
 
     router.post(
         route('admin.posts.unpublish', props.post.id),
@@ -468,7 +611,24 @@ const unpublish = () => {
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <SecondaryButton
+                                    v-if="navigator.previous"
+                                    type="button"
+                                    :disabled="form.processing || publishing"
+                                    @click="navigateToPost(navigator.previous.id)"
+                                >
+                                    ← Previous
+                                </SecondaryButton>
+
+                                <SecondaryButton
+                                    v-if="navigator.next"
+                                    type="button"
+                                    :disabled="form.processing || publishing"
+                                    @click="navigateToPost(navigator.next.id)"
+                                >
+                                    Next →
+                                </SecondaryButton>
                                 <PrimaryButton type="submit" :disabled="form.processing">
                                     {{ form.processing ? 'Saving…' : 'Save' }}
                                 </PrimaryButton>
@@ -504,7 +664,7 @@ const unpublish = () => {
                     </div>
                 </div>
 
-                <section class="space-y-4 rounded-lg border bg-white p-4">
+                <section id="post-section-content" data-post-section="content" class="scroll-mt-28 space-y-4 rounded-lg border bg-white p-4">
                     <div class="text-sm font-semibold text-gray-900">Content</div>
 
                     <div>
@@ -563,7 +723,7 @@ const unpublish = () => {
                     </div>
                 </section>
 
-                <section class="space-y-4 rounded-lg border bg-white p-4">
+                <section id="post-section-media" data-post-section="media" class="scroll-mt-28 space-y-4 rounded-lg border bg-white p-4">
                     <div class="text-sm font-semibold text-gray-900">Media</div>
 
                     <div>
@@ -644,8 +804,8 @@ const unpublish = () => {
                     </div>
                 </section>
 
-                
-<section class="space-y-4 rounded-lg border bg-white p-4">
+
+                <section id="post-section-taxonomy" data-post-section="taxonomy" class="scroll-mt-28 space-y-4 rounded-lg border bg-white p-4">
     <div class="text-sm font-semibold text-gray-900">Taxonomy</div>
 
     <div class="space-y-6">
@@ -667,7 +827,7 @@ const unpublish = () => {
                     type="text"
                     class="block h-9 w-full"
                     placeholder="Search categories"
-                    
+
                 />
 
                 <div class="max-h-40 overflow-y-auto pr-1">
@@ -755,7 +915,7 @@ const unpublish = () => {
                     type="text"
                     class="block h-9 w-full"
                     placeholder="Search tags"
-                    
+
                 />
 
                 <div class="max-h-40 overflow-y-auto pr-1">
@@ -832,7 +992,7 @@ const unpublish = () => {
 </section>
 
 
-                <section class="space-y-4 rounded-lg border bg-white p-4">
+                <section id="post-section-seo" data-post-section="seo" class="scroll-mt-28 space-y-4 rounded-lg border bg-white p-4">
                     <div class="text-sm font-semibold text-gray-900">SEO</div>
 
                     <div class="grid gap-4 lg:grid-cols-2">

@@ -69,6 +69,7 @@ class PostController extends Controller
         return Inertia::render('Admin/Posts/Create', [
             'categories' => Category::query()->orderBy('name')->get(['id', 'name', 'slug']),
             'tags' => Tag::query()->orderBy('name')->get(['id', 'name', 'slug']),
+            'navigator' => $this->buildPostNavigator($post),
         ]);
     }
 
@@ -169,6 +170,7 @@ class PostController extends Controller
                 'og_image_path' => $post->og_image_path,
                 'noindex' => (bool) $post->noindex,
             ],
+            'navigator' => $this->buildPostNavigator($post),
         ]);
     }
 
@@ -201,6 +203,7 @@ class PostController extends Controller
             ],
             'categories' => Category::query()->orderBy('name')->get(['id', 'name', 'slug']),
             'tags' => Tag::query()->orderBy('name')->get(['id', 'name', 'slug']),
+            'navigator' => $this->buildPostNavigator($post),
         ]);
     }
 
@@ -274,37 +277,35 @@ class PostController extends Controller
             ->with('success', 'Post saved.');
     }
 
-    public function publish(Request $request, Post $post)
-    {
-        $post->forceFill([
-            'status' => Post::STATUS_PUBLISHED,
-            'published_at' => now(),
-            'updated_by' => (int) $request->user()->id,
-        ])->save();
+    public function publish(Post $post)
+{
+    $post->update([
+        'status' => Post::STATUS_PUBLISHED,
+        'published_at' => now(),
+        'updated_by' => auth()->id(),
+    ]);
 
-        return redirect()->route('admin.posts.edit', $post);
-    }
+    return back()->with('success', 'Post published successfully.');
+}
 
-    public function unpublish(Request $request, Post $post)
-    {
-        $post->forceFill([
-            'status' => Post::STATUS_DRAFT,
-            'published_at' => null,
-            'updated_by' => (int) $request->user()->id,
-        ])->save();
+public function unpublish(Post $post)
+{
+    $post->update([
+        'status' => Post::STATUS_DRAFT,
+        'published_at' => null,
+        'updated_by' => auth()->id(),
+    ]);
 
-        return redirect()->route('admin.posts.edit', $post);
-    }
+    return back()->with('success', 'Post unpublished successfully.');
+}
 
-    public function destroy(Post $post)
-    {
-        $post->delete();
+public function destroy(Post $post)
+{
+    $post->tags()->detach();
+    $post->delete();
 
-        return redirect()
-            ->route('admin.posts.index')
-            ->with('success', 'Post deleted.');
-    }
-
+    return back()->with('success', 'Post deleted successfully.');
+}
     private function validatePost(Request $request): array
     {
         return $request->validate([
@@ -367,6 +368,44 @@ class PostController extends Controller
         } while ($existing->contains($candidate));
 
         return $candidate;
+    }
+
+    private function buildPostNavigator(Post $post): array
+    {
+        $orderedIds = Post::query()
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->pluck('id')
+            ->values();
+
+        $currentIndex = $orderedIds->search($post->id);
+
+        if ($currentIndex === false) {
+            return [
+                'previous' => null,
+                'next' => null,
+            ];
+        }
+
+        $previousId = $currentIndex > 0 ? $orderedIds->get($currentIndex - 1) : null;
+        $nextId = $currentIndex < ($orderedIds->count() - 1) ? $orderedIds->get($currentIndex + 1) : null;
+
+        $neighbors = Post::query()
+            ->whereIn('id', array_filter([$previousId, $nextId]))
+            ->get(['id', 'title'])
+            ->keyBy('id');
+
+        $mapPost = static fn (?int $id) => $id && $neighbors->has($id)
+            ? [
+                'id' => $id,
+                'title' => $neighbors->get($id)?->title,
+            ]
+            : null;
+
+        return [
+            'previous' => $mapPost($previousId),
+            'next' => $mapPost($nextId),
+        ];
     }
 
     private function storeImageInBlogLibrary(UploadedFile $file, string $baseName): string

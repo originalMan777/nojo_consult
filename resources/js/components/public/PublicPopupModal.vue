@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useForm, usePage } from '@inertiajs/vue3'
+import { route } from 'ziggy-js';
+
 
 type PopupRecord = {
   id: number
@@ -282,7 +284,7 @@ function submitLead() {
   form.page_key = pageKey.value
   form.source_url = typeof window !== 'undefined' ? window.location.href : ''
 
-  form.post('/popup-leads', {
+ form.post(route('popup-leads.store'), {
     preserveScroll: true,
     preserveState: true,
     onSuccess: () => {

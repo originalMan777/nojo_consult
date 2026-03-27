@@ -64,7 +64,6 @@ const applyFilters = (immediate = false) => {
 watch(status, () => applyFilters(true));
 
 const formatDate = (value: string | null) => {
-
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
@@ -72,6 +71,26 @@ const formatDate = (value: string | null) => {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+    });
+};
+
+const publishPost = (post: PostRow) => {
+    router.post(route('admin.posts.publish', post.id), {}, {
+        preserveScroll: true,
+    });
+};
+
+const unpublishPost = (post: PostRow) => {
+    router.post(route('admin.posts.unpublish', post.id), {}, {
+        preserveScroll: true,
+    });
+};
+
+const deletePost = (post: PostRow) => {
+    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+
+    router.delete(route('admin.posts.destroy', post.id), {
+        preserveScroll: true,
     });
 };
 </script>
@@ -206,7 +225,7 @@ const formatDate = (value: string | null) => {
                                         </td>
 
                                         <td class="px-4 py-3 text-right">
-                                            <div class="flex justify-end gap-3">
+                                            <div class="flex flex-wrap justify-end gap-3">
                                                 <Link
                                                     :href="route('admin.posts.show', post.id)"
                                                     class="text-sm font-medium text-gray-700 hover:text-gray-900"
@@ -220,6 +239,32 @@ const formatDate = (value: string | null) => {
                                                 >
                                                     Edit
                                                 </Link>
+
+                                                <button
+                                                    v-if="post.status === 'draft'"
+                                                    type="button"
+                                                    class="text-sm font-medium text-green-600 hover:text-green-700"
+                                                    @click="publishPost(post)"
+                                                >
+                                                    Publish
+                                                </button>
+
+                                                <button
+                                                    v-else
+                                                    type="button"
+                                                    class="text-sm font-medium text-amber-600 hover:text-amber-700"
+                                                    @click="unpublishPost(post)"
+                                                >
+                                                    Unpublish
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="text-sm font-medium text-red-600 hover:text-red-700"
+                                                    @click="deletePost(post)"
+                                                >
+                                                    Delete
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

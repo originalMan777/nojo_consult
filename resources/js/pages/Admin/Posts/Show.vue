@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AdminLayout from '@/AppLayouts/AdminLayout.vue';
 import PrimaryButton from '@/components/PrimaryButton.vue';
 import SecondaryButton from '@/components/SecondaryButton.vue';
+
+type PostNavigatorItem = {
+    id: number;
+    title: string | null;
+};
+
+type PostNavigator = {
+    previous: PostNavigatorItem | null;
+    next: PostNavigatorItem | null;
+};
 
 type PostDto = {
     id: number;
@@ -29,10 +39,81 @@ type PostDto = {
 
 const props = defineProps<{
     post: PostDto;
+    navigator: PostNavigator;
 }>();
 
 const isPublished = computed(() => props.post.status === 'published');
 const publishing = ref(false);
+
+const sectionIds = ['content', 'details', 'seo'] as const;
+type SectionId = (typeof sectionIds)[number];
+const activeSection = ref<SectionId>('content');
+let sectionObserver: IntersectionObserver | null = null;
+const sectionStorageKey = 'admin-post-show-section';
+
+const normalizeSection = (value: string | null | undefined): SectionId => {
+    if (value && sectionIds.includes(value as SectionId)) {
+        return value as SectionId;
+    }
+
+    return 'content';
+};
+
+const readSectionFromUrl = (): SectionId => {
+    if (typeof window === 'undefined') return 'content';
+
+    const params = new URL(window.location.href).searchParams;
+    return normalizeSection(params.get('section') ?? sessionStorage.getItem(sectionStorageKey));
+};
+
+const persistActiveSection = (section: SectionId) => {
+    activeSection.value = section;
+
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem(sectionStorageKey, section);
+    }
+};
+
+const scrollToSection = (section: SectionId) => {
+    nextTick(() => {
+        const target = document.getElementById(`post-show-section-${section}`);
+        target?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+};
+
+const setupSectionObserver = () => {
+    if (typeof window === 'undefined') return;
+
+    sectionObserver?.disconnect();
+
+    const elements = sectionIds
+        .map((section) => document.getElementById(`post-show-section-${section}`))
+        .filter((element): element is HTMLElement => element instanceof HTMLElement);
+
+    if (!elements.length) return;
+
+    sectionObserver = new IntersectionObserver(
+        (entries) => {
+            const visibleEntries = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+            const visible = visibleEntries[0];
+            const section = visible?.target.getAttribute('data-post-section');
+
+            if (section) {
+                persistActiveSection(normalizeSection(section));
+            }
+        },
+        {
+            rootMargin: '-120px 0px -55% 0px',
+            threshold: [0.15, 0.35, 0.6],
+        },
+    );
+
+    elements.forEach((element) => sectionObserver?.observe(element));
+};
+
 
 const formatDate = (value: string | null) => {
     if (!value) return '—';
@@ -50,11 +131,29 @@ const backToPosts = () => {
 };
 
 const editPost = () => {
-    router.visit(route('admin.posts.edit', props.post.id));
+    router.visit(
+        route('admin.posts.edit', {
+            post: props.post.id,
+            section: activeSection.value,
+        }),
+    );
+};
+
+const navigateToPost = (postId: number) => {
+    persistActiveSection(activeSection.value);
+
+    router.visit(
+        route('admin.posts.show', {
+            post: postId,
+            section: activeSection.value,
+        }),
+    );
 };
 
 const publish = () => {
     publishing.value = true;
+
+    persistActiveSection(activeSection.value);
 
     router.post(
         route('admin.posts.publish', props.post.id),
@@ -71,6 +170,8 @@ const publish = () => {
 const unpublish = () => {
     publishing.value = true;
 
+    persistActiveSection(activeSection.value);
+
     router.post(
         route('admin.posts.unpublish', props.post.id),
         {},
@@ -82,6 +183,17 @@ const unpublish = () => {
         },
     );
 };
+
+onMounted(() => {
+    persistActiveSection(readSectionFromUrl());
+    setupSectionObserver();
+    scrollToSection(activeSection.value);
+});
+
+onBeforeUnmount(() => {
+    sectionObserver?.disconnect();
+    sectionObserver = null;
+});
 </script>
 
 <template>
@@ -115,7 +227,24 @@ const unpublish = () => {
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <SecondaryButton
+                                v-if="navigator.previous"
+                                type="button"
+                                :disabled="publishing"
+                                @click="navigateToPost(navigator.previous.id)"
+                            >
+                                ← Previous
+                            </SecondaryButton>
+
+                            <SecondaryButton
+                                v-if="navigator.next"
+                                type="button"
+                                :disabled="publishing"
+                                @click="navigateToPost(navigator.next.id)"
+                            >
+                                Next →
+                            </SecondaryButton>
                             <PrimaryButton type="button" @click="editPost">
                                 Edit
                             </PrimaryButton>
@@ -147,7 +276,7 @@ const unpublish = () => {
             </div>
 
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <article class="rounded-lg border bg-white p-6">
+                <article id="post-show-section-content" data-post-section="content" class="scroll-mt-28 rounded-lg border bg-white p-6">
                     <div v-if="post.featured_image_url" class="mb-6">
                         <img
                             :src="post.featured_image_url"
@@ -174,7 +303,7 @@ const unpublish = () => {
                 </article>
 
                 <aside class="space-y-6">
-                    <section class="rounded-lg border bg-white p-4">
+                    <section id="post-show-section-details" data-post-section="details" class="scroll-mt-28 rounded-lg border bg-white p-4">
                         <div class="text-sm font-semibold text-gray-900">Post Details</div>
 
                         <dl class="mt-4 space-y-3 text-sm">
@@ -211,7 +340,7 @@ const unpublish = () => {
                         </dl>
                     </section>
 
-                    <section class="rounded-lg border bg-white p-4">
+                    <section id="post-show-section-seo" data-post-section="seo" class="scroll-mt-28 rounded-lg border bg-white p-4">
                         <div class="text-sm font-semibold text-gray-900">SEO</div>
 
                         <dl class="mt-4 space-y-3 text-sm">

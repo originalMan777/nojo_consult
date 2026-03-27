@@ -22,8 +22,12 @@ type CategoryConfig = {
 
 type ToolConfig = {
     generator: {
+        allowed_result_counts: number[];
         default_result_count: number;
         max_result_count: number;
+        max_selections_per_group: number;
+        min_combination_threshold: number;
+        combination_group_keys: string[];
         required_groups: string[];
         tier_1_groups: string[];
         tier_2_groups: string[];
@@ -115,6 +119,9 @@ const props = defineProps<{
     config: ToolConfig;
 }>();
 
+const FALLBACK_ALLOWED_RESULT_COUNTS = [25, 50, 100, 150];
+const MAX_ACTIVE_CATEGORIES = 10;
+
 const categoryMap = computed<Record<string, CategoryConfig>>(() => {
     return props.config.categories.reduce((carry, category) => {
         carry[category.key] = category;
@@ -175,6 +182,17 @@ function initializeState() {
     }
 }
 
+const allowedResultCounts = computed(() => {
+    const counts = props.config.generator.allowed_result_counts?.length
+        ? props.config.generator.allowed_result_counts
+        : FALLBACK_ALLOWED_RESULT_COUNTS;
+
+    return [...counts].sort((left, right) => left - right);
+});
+
+const maxSelectionsPerCategory = computed(() => props.config.generator.max_selections_per_group || 20);
+const combinationTarget = computed(() => props.config.generator.min_combination_threshold || 1000);
+
 initializeState();
 clampBatchSize();
 
@@ -188,8 +206,76 @@ const optionalCategories = computed(() => {
     );
 });
 
-const totalSelectedCount = computed(() => {
-    return Object.values(selected).reduce((sum, group) => sum + Object.keys(group || {}).length, 0);
+const selectableCategoryKeys = computed(() => {
+    return props.config.categories
+        .filter((category) => category.key !== 'extra_direction')
+        .map((category) => category.key);
+});
+
+const topicSelectedCount = computed(() => selectedCount('topics'));
+
+const activeCategoryKeys = computed(() => {
+    return selectableCategoryKeys.value.filter((groupKey) => selectedCount(groupKey) > 0);
+});
+
+const activeCategoryCount = computed(() => activeCategoryKeys.value.length);
+
+const totalSelectedFieldCount = computed(() => {
+    return activeCategoryKeys.value.reduce((sum, groupKey) => sum + selectedCount(groupKey), 0);
+});
+
+const totalCombinationCount = computed(() => {
+    const trackedGroupKeys = props.config.generator.combination_group_keys?.length
+        ? props.config.generator.combination_group_keys
+        : selectableCategoryKeys.value;
+
+    const counts = trackedGroupKeys
+        .map((groupKey) => selectedCount(groupKey))
+        .filter((count) => count > 0);
+
+    if (!counts.length) {
+        return 0;
+    }
+
+    return counts.reduce((product, count) => product * count, 1);
+});
+
+const isUnlocked = computed(() => {
+    return topicSelectedCount.value > 0 && totalCombinationCount.value >= combinationTarget.value;
+});
+
+const currentStatus = computed(() => {
+    const combinations = totalCombinationCount.value;
+
+    if (combinations >= 50000) return 'Monster';
+    if (combinations >= 25000) return 'Master';
+    if (combinations >= 10000) return 'Powerhouse';
+    if (combinations >= 5000) return 'Strong';
+    if (combinations >= 1000) return 'Ready';
+    if (combinations >= 500) return 'Builder';
+    if (combinations >= 100) return 'Starter';
+
+    return 'Starting';
+});
+
+const adaptiveTip = computed(() => {
+    if (topicSelectedCount.value < 1) {
+        return 'Start by selecting at least one topic.';
+    }
+
+    if (totalCombinationCount.value >= combinationTarget.value) {
+        return '';
+    }
+
+    if (activeCategoryCount.value < 2 || totalCombinationCount.value < 100) {
+        return 'Add another category to multiply faster.';
+    }
+
+    if (totalCombinationCount.value >= 800) {
+        return 'You’re close—add a few more selections.';
+    }
+
+    return 'Add more selections to increase combinations.';
 });
 
 const estimatedCoreCombinations = computed(() => {
@@ -210,6 +296,7 @@ const canReset = computed(() => {
 });
 
 const isLoading = computed(() => loadingAction.value !== null);
+const canGenerate = computed(() => isUnlocked.value && !isLoading.value);
 
 const tierName = computed(() => {
     return props.config.generator.tier.name.replace('_', ' ');
@@ -244,6 +331,10 @@ function toggleItem(groupKey: string, label: string) {
         return;
     }
 
+    if (!canAddSelection(groupKey)) {
+        return;
+    }
+
     selected[groupKey][label] = { label, stars: 1 };
 }
 
@@ -253,6 +344,10 @@ function setStars(groupKey: string, label: string, stars: 1 | 2 | 3) {
     }
 
     if (!selected[groupKey][label]) {
+        if (!canAddSelection(groupKey)) {
+            return;
+        }
+
         selected[groupKey][label] = { label, stars };
         return;
     }
@@ -281,7 +376,16 @@ function selectAll(category: CategoryConfig) {
     }
 
     for (const item of category.items) {
+        if (selectedCount(category.key) >= maxSelectionsPerCategory.value) {
+            errorMessage.value = `You can select up to ${maxSelectionsPerCategory.value} fields in ${category.label}.`;
+            break;
+        }
+
         if (!selected[category.key][item]) {
+            if (!canAddSelection(category.key)) {
+                break;
+            }
+
             selected[category.key][item] = { label: item, stars: 1 };
         }
     }
@@ -293,6 +397,24 @@ function clearAll(category: CategoryConfig) {
 
 function selectedCount(groupKey: string): number {
     return Object.keys(selected[groupKey] || {}).length;
+}
+
+function canAddSelection(groupKey: string): boolean {
+    const groupLabel = categoryMap.value[groupKey]?.label ?? 'this category';
+    const currentGroupCount = selectedCount(groupKey);
+
+    if (currentGroupCount >= maxSelectionsPerCategory.value) {
+        errorMessage.value = `You can select up to ${maxSelectionsPerCategory.value} fields in ${groupLabel}.`;
+        return false;
+    }
+
+    if (currentGroupCount === 0 && activeCategoryCount.value >= MAX_ACTIVE_CATEGORIES) {
+        errorMessage.value = `You can use up to ${MAX_ACTIVE_CATEGORIES} categories at a time.`;
+        return false;
+    }
+
+    errorMessage.value = '';
+    return true;
 }
 
 function rowAccordionKey(row: GeneratedRow, index: number) {
@@ -309,13 +431,11 @@ function toggleRow(row: GeneratedRow, index: number) {
 }
 
 function clampBatchSize() {
-    const fallback = props.config.generator.default_result_count || props.config.generator.tier.batch_size;
-    const min = 1;
-    const max = props.config.generator.max_result_count;
+    const fallback = props.config.generator.default_result_count || allowedResultCounts.value[0] || props.config.generator.tier.batch_size;
     const raw = Number(batchSize.value);
+    const normalized = Number.isFinite(raw) ? Math.round(raw) : fallback;
 
-    batchSize.value = Number.isFinite(raw) ? raw : fallback;
-    batchSize.value = Math.max(min, Math.min(max, Math.round(batchSize.value)));
+    batchSize.value = allowedResultCounts.value.includes(normalized) ? normalized : fallback;
 }
 
 function clampWords() {
@@ -369,12 +489,22 @@ function buildPayload(action: 'generate' | 'continue' | 'reset') {
     };
 }
 
-function validateRequiredSelections(): boolean {
+function validateRequiredSelections(action: 'generate' | 'continue' | 'reset'): boolean {
+    if (action === 'continue') {
+        errorMessage.value = '';
+        return true;
+    }
+
     for (const category of requiredCategories.value) {
         if (selectedCount(category.key) < 1) {
             errorMessage.value = `Please select at least one option for ${category.label}.`;
             return false;
         }
+    }
+
+    if (totalCombinationCount.value < combinationTarget.value) {
+        errorMessage.value = 'Select fields. Reach 1,000 combinations to proceed.';
+        return false;
     }
 
     errorMessage.value = '';
@@ -385,7 +515,7 @@ async function submitAction(action: 'generate' | 'continue' | 'reset') {
     successMessage.value = '';
     errorMessage.value = '';
 
-    if (!validateRequiredSelections()) {
+    if (!validateRequiredSelections(action)) {
         return;
     }
 
@@ -824,20 +954,52 @@ onBeforeUnmount(() => {
                                 <div class="border-b border-stone-200 px-6 py-5">
                                     <h2 class="text-lg font-semibold text-stone-900">Control Center</h2>
                                     <p class="mt-1 text-sm text-stone-600">
-                                        Generate paid-tier batches, continue the same session without structural repeats, or reset into a fresh shuffle with the same selections.
+                                        {{ isUnlocked ? 'Combination target reached.' : 'Select fields. Reach 1,000 combinations to proceed.' }}
                                     </p>
                                 </div>
 
                                 <div class="space-y-5 px-6 py-6">
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="rounded-2xl bg-stone-50 p-4">
-                                            <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Selected</div>
-                                            <div class="mt-2 text-2xl font-semibold text-stone-900">{{ totalSelectedCount }}</div>
+                                    <div class="rounded-3xl border border-stone-200 bg-stone-50 p-4 transition-all duration-300">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Combination Count</div>
+                                                <div class="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
+                                                    {{ totalCombinationCount.toLocaleString() }} / {{ combinationTarget.toLocaleString() }}
+                                                </div>
+                                            </div>
+                                            <div class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-stone-900 shadow-sm">
+                                                {{ currentStatus }}
+                                            </div>
                                         </div>
-                                        <div class="rounded-2xl bg-stone-50 p-4">
-                                            <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Session Rows</div>
-                                            <div class="mt-2 text-2xl font-semibold text-stone-900">{{ meta?.session_generated_count ?? 0 }}</div>
+
+                                        <div
+                                            class="overflow-hidden transition-all duration-300"
+                                            :class="isUnlocked ? 'max-h-0 opacity-0' : 'mt-4 max-h-40 opacity-100'"
+                                        >
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div class="rounded-2xl bg-white p-3">
+                                                    <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Active Categories</div>
+                                                    <div class="mt-2 text-xl font-semibold text-stone-900">{{ activeCategoryCount }}</div>
+                                                </div>
+                                                <div class="rounded-2xl bg-white p-3">
+                                                    <div class="text-xs font-medium uppercase tracking-wide text-stone-500">Selected Fields</div>
+                                                    <div class="mt-2 text-xl font-semibold text-stone-900">{{ totalSelectedFieldCount }}</div>
+                                                </div>
+                                            </div>
+
+                                            <p class="mt-3 text-sm text-stone-600">
+                                                {{ adaptiveTip }}
+                                            </p>
                                         </div>
+
+                                        <button
+                                            type="button"
+                                            class="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                                            :disabled="!canGenerate"
+                                            @click="submitAction('generate')"
+                                        >
+                                            {{ loadingAction === 'generate' ? 'Generating...' : `Generate ${batchSize} Ideas` }}
+                                        </button>
                                     </div>
 
                                     <div class="rounded-3xl border border-stone-200 bg-stone-50 p-4">
@@ -847,7 +1009,7 @@ onBeforeUnmount(() => {
                                                     Batch Size
                                                 </label>
                                                 <p class="mt-1 text-sm text-stone-600">
-                                                    Choose how many ideas to generate in the next batch.
+                                                    Choose how many variations to generate from your available combinations.
                                                 </p>
                                             </div>
                                             <div class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-stone-900 shadow-sm">
@@ -855,17 +1017,26 @@ onBeforeUnmount(() => {
                                             </div>
                                         </div>
 
-                                        <div class="mt-5">
-                                            <input
-                                                v-model.number="batchSize"
-                                                type="number"
-                                                min="1"
-                                                :max="props.config.generator.max_result_count"
-                                                class="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none placeholder:text-stone-400 focus:border-teal-600"
-                                                @change="clampBatchSize"
-                                            />
-                                            <p class="mt-2 text-xs text-stone-500">
-                                                Max {{ props.config.generator.max_result_count }} ideas per batch.
+                                        <div class="mt-5 grid grid-cols-2 gap-3">
+                                            <button
+                                                v-for="count in allowedResultCounts"
+                                                :key="count"
+                                                type="button"
+                                                class="rounded-2xl border px-4 py-3 text-sm font-semibold transition"
+                                                :class="batchSize === count
+                                                    ? 'border-teal-700 bg-teal-700 text-white'
+                                                    : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'"
+                                                @click="batchSize = count"
+                                            >
+                                                {{ count }}
+                                            </button>
+                                        </div>
+                                        <div class="mt-3 space-y-2">
+                                            <p class="text-xs text-stone-500">
+                                                Choose from {{ allowedResultCounts.join(', ') }} results per batch.
+                                            </p>
+                                            <p class="text-xs text-stone-500">
+                                                Generated results are sampled from your available combinations.
                                             </p>
                                         </div>
                                     </div>
@@ -933,51 +1104,7 @@ onBeforeUnmount(() => {
                                         </div>
                                     </div>
 
-                                    <div class="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
-                                        <div class="flex items-center justify-between">
-                                            <span>Topics</span>
-                                            <span class="font-medium">{{ selectedCount('topics') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Article Types</span>
-                                            <span class="font-medium">{{ selectedCount('article_types') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Formats</span>
-                                            <span class="font-medium">{{ selectedCount('article_formats') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Vibes</span>
-                                            <span class="font-medium">{{ selectedCount('vibes') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Reader Impact</span>
-                                            <span class="font-medium">{{ selectedCount('reader_impacts') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Audience</span>
-                                            <span class="font-medium">{{ selectedCount('audiences') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Context</span>
-                                            <span class="font-medium">{{ selectedCount('contexts') }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Perspective</span>
-                                            <span class="font-medium">{{ selectedCount('perspectives') }}</span>
-                                        </div>
-                                    </div>
-
                                     <div class="space-y-3">
-                                        <button
-                                            type="button"
-                                            class="inline-flex w-full items-center justify-center rounded-2xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
-                                            :disabled="isLoading"
-                                            @click="submitAction('generate')"
-                                        >
-                                            {{ loadingAction === 'generate' ? 'Generating...' : `Generate ${batchSize} Ideas` }}
-                                        </button>
-
                                         <div class="grid grid-cols-2 gap-3">
                                             <button
                                                 type="button"

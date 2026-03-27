@@ -8,10 +8,13 @@ class ContentFormulaGenerator
     protected array $starWeights;
     protected array $requiredGroups;
     protected array $variationConfig;
+    protected array $fallbackProfile;
+    protected ContentFormulaRules $rules;
 
     public function __construct()
     {
         $this->config = config('content_formula', []);
+        $this->rules = app(ContentFormulaRules::class);
         $this->starWeights = (array) data_get($this->config, 'generator.star_weights', [
             1 => 1,
             2 => 2,
@@ -19,12 +22,15 @@ class ContentFormulaGenerator
         ]);
         $this->requiredGroups = (array) data_get($this->config, 'generator.required_groups', []);
         $this->variationConfig = (array) data_get($this->config, 'generator.variation', []);
+        $this->fallbackProfile = (array) data_get($this->config, 'generator.fallback_profile', []);
     }
 
     public function generateBatch(array $settings, array $session): array
     {
         $groups = (array) ($settings['groups'] ?? []);
-        $resultCount = (int) ($settings['result_count'] ?? data_get($this->config, 'generator.default_result_count', 50));
+        $resultCount = $this->rules->normalizeResultCount(
+            isset($settings['result_count']) ? (int) $settings['result_count'] : null
+        );
         $extraDirection = trim((string) ($settings['extra_direction'] ?? ''));
         $minWords = (int) ($settings['min_words'] ?? data_get($this->config, 'generator.word_range.default_min', 800));
         $maxWords = (int) ($settings['max_words'] ?? data_get($this->config, 'generator.word_range.default_max', 1400));
@@ -154,15 +160,39 @@ class ContentFormulaGenerator
     {
         return [
             'topic' => $this->weightedPick('topics', $pools['topics'], $usage)['label'],
-            'article_type' => $this->weightedPick('article_types', $pools['article_types'], $usage)['label'],
-            'article_format' => $this->weightedPick('article_formats', $pools['article_formats'], $usage)['label'],
-            'vibe' => $this->weightedPick('vibes', $pools['vibes'], $usage)['label'],
+            'article_type' => $this->pickRequiredOrFallback(
+                'article_types',
+                $pools['article_types'],
+                $usage,
+                (string) ($this->fallbackProfile['article_type'] ?? 'Insights')
+            ),
+            'article_format' => $this->pickRequiredOrFallback(
+                'article_formats',
+                $pools['article_formats'],
+                $usage,
+                (string) ($this->fallbackProfile['article_format'] ?? 'Guide')
+            ),
+            'vibe' => $this->pickRequiredOrFallback(
+                'vibes',
+                $pools['vibes'],
+                $usage,
+                (string) ($this->fallbackProfile['vibe'] ?? 'Clear')
+            ),
             'reader_impact' => $this->pickOptional('reader_impacts', $pools, $usage, true),
             'audience' => $this->pickOptional('audiences', $pools, $usage, true),
             'context' => $this->pickOptional('contexts', $pools, $usage, true),
             'perspective' => $this->pickOptional('perspectives', $pools, $usage, false),
             'extra_direction' => $extraDirection !== '' ? $extraDirection : null,
         ];
+    }
+
+    protected function pickRequiredOrFallback(string $groupKey, array $items, array $usage, string $fallback): string
+    {
+        if (empty($items)) {
+            return $fallback;
+        }
+
+        return $this->weightedPick($groupKey, $items, $usage)['label'];
     }
 
     protected function pickOptional(string $groupKey, array $pools, array $usage, bool $alwaysInclude): ?string

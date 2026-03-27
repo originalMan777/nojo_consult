@@ -16,6 +16,17 @@ use App\Http\Controllers\Public\LeadController;
 use App\Http\Controllers\Public\PostController as PublicPostController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Public\PopupLeadController;
+
+
+Route::get('/blog-test-page', function () {
+    return Inertia::render('Blog/Index');
+})->name('blog.test.page');
+
+
+
+Route::post('/popup-leads', [PopupLeadController::class, 'store'])
+    ->name('popup-leads.store');
 
 /*
 |--------------------------------------------------------------------------

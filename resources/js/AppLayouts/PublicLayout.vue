@@ -25,7 +25,7 @@ const props = withDefaults(
 
 const page = usePage<any>()
 
-const { user, displayName, dashboardHref, profileHref } = usePublicAuthNavigation()
+const { user, displayName, hasAdminWorkspace, dashboardHref, profileHref } = usePublicAuthNavigation()
 const categories = computed<CategoryItem[]>(() => page.props?.categories ?? [])
 
 const sidebarOpen = ref(true)
@@ -59,6 +59,7 @@ function toggleSidebar() {
               Blog
             </Link>
 
+
             <Link href="/sites" class="text-sm text-gray-600 hover:text-gray-900">
               Sites
             </Link>
@@ -76,7 +77,7 @@ function toggleSidebar() {
               </Link>
 
               <Link
-                v-if="dashboardHref"
+                v-if="hasAdminWorkspace"
                 :href="dashboardHref"
                 class="text-sm text-gray-600 hover:text-gray-900"
               >
@@ -217,7 +218,7 @@ function toggleSidebar() {
             <Link href="/" class="transition hover:text-gray-900">
               Home
             </Link>
-            <Link :href="route('blog.index')" class="transition hover:text-gray-900">
+                <Link href="/blog" class="transition hover:text-gray-900">
               Blog
             </Link>
             <Link href="/sites" class="transition hover:text-gray-900">

@@ -31,6 +31,12 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="min-h-screen bg-gray-50 text-gray-900">
+        <div class="border-b border-amber-200 bg-amber-50">
+            <div class="mx-auto max-w-7xl px-4 py-2 text-center text-sm font-medium text-amber-900">
+                This website is currently under development. Some pages and features are still being finalized.
+            </div>
+        </div>
+
         <FrontTopNavA />
         <FrontTopNavB />
 

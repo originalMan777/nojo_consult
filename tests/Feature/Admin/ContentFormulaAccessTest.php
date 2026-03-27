@@ -60,6 +60,7 @@ class ContentFormulaAccessTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.meta.tier', 'paid')
+            ->assertJsonPath('data.meta.requested_count', 25)
             ->assertJsonCount(5, 'data.rows.0.title_options')
             ->assertJsonCount(2, 'data.rows.0.standard_prompts')
             ->assertJsonCount(3, 'data.rows.0.optimized_prompts');
@@ -69,21 +70,45 @@ class ContentFormulaAccessTest extends TestCase
     {
         return [
             'action' => 'generate',
-            'result_count' => 1,
+            'result_count' => 25,
             'min_words' => 600,
             'max_words' => 1200,
             'groups' => [
                 'topics' => [
                     ['label' => 'Buying a Home', 'stars' => 1],
+                    ['label' => 'Selling a Home', 'stars' => 1],
+                    ['label' => 'First-Time Buyers', 'stars' => 1],
+                    ['label' => 'Home Pricing', 'stars' => 1],
+                    ['label' => 'Mortgage Options', 'stars' => 1],
+                    ['label' => 'Interest Rates', 'stars' => 1],
+                    ['label' => 'Closing Costs', 'stars' => 1],
+                    ['label' => 'Pre-Approval', 'stars' => 1],
+                    ['label' => 'Negotiation', 'stars' => 1],
+                    ['label' => 'Open Houses', 'stars' => 1],
                 ],
                 'article_types' => [
                     ['label' => 'Problems', 'stars' => 1],
+                    ['label' => 'Strategies', 'stars' => 1],
+                    ['label' => 'Mistakes', 'stars' => 1],
+                    ['label' => 'Trends', 'stars' => 1],
+                    ['label' => 'Questions', 'stars' => 1],
+                    ['label' => 'Comparisons', 'stars' => 1],
+                    ['label' => 'Myths', 'stars' => 1],
+                    ['label' => 'Opportunities', 'stars' => 1],
+                    ['label' => 'Cases', 'stars' => 1],
+                    ['label' => 'Predictions', 'stars' => 1],
                 ],
                 'article_formats' => [
                     ['label' => 'Checklist', 'stars' => 1],
-                ],
-                'vibes' => [
-                    ['label' => 'Honest', 'stars' => 1],
+                    ['label' => 'Guide', 'stars' => 1],
+                    ['label' => 'List', 'stars' => 1],
+                    ['label' => 'Steps', 'stars' => 1],
+                    ['label' => 'Breakdown', 'stars' => 1],
+                    ['label' => 'Explanation', 'stars' => 1],
+                    ['label' => 'Framework', 'stars' => 1],
+                    ['label' => 'FAQ', 'stars' => 1],
+                    ['label' => 'Case Study', 'stars' => 1],
+                    ['label' => 'Freeform', 'stars' => 1],
                 ],
             ],
         ];

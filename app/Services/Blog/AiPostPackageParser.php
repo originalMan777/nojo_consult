@@ -11,7 +11,10 @@ class AiPostPackageParser
      */
     public function parse(string $package): array
     {
-        $normalized = str_replace(["\r\n", "\r"], "\n", trim($package));
+        $normalized = str_replace(["
+", ""], "
+", trim($package));
+        $normalized = preg_replace('/^ï»¿/', '', $normalized) ?? $normalized;
 
         if ($normalized === '') {
             throw ValidationException::withMessages([
@@ -19,7 +22,12 @@ class AiPostPackageParser
             ]);
         }
 
-        if (! preg_match('/\ATITLE:\s*\n?(.*?)\n+ARTICLE:\s*\n?(.*?)\n+LIST:\s*\n?(.*)\z/s', $normalized, $matches)) {
+        if (! preg_match('/\ATITLE:\s*
+?(.*?)
++ARTICLE:\s*
+?(.*?)
++LIST:\s*
+?(.*)\z/s', $normalized, $matches)) {
             throw ValidationException::withMessages([
                 'package' => 'The package must contain TITLE:, ARTICLE:, and LIST: sections in the exact order.',
             ]);
@@ -52,7 +60,8 @@ class AiPostPackageParser
             'Noindex',
         ];
 
-        $lines = preg_split('/\n+/', $list) ?: [];
+        $lines = preg_split('/
++/', $list) ?: [];
         $parsedLabels = [];
         $parsedValues = [];
 
@@ -63,11 +72,9 @@ class AiPostPackageParser
                 continue;
             }
 
-            $normalizedLine = preg_replace('/^(?:[-*•]\s+)?/', '', $line, 1) ?? $line;
-
-            if (! preg_match('/^([^:]+):\s*(.*)\z/', $normalizedLine, $lineMatches)) {
+            if (! preg_match('/^(?:[-*•]\s+)?([^:]+):\s*(.*)\z/u', $line, $lineMatches)) {
                 throw ValidationException::withMessages([
-                    'package' => 'Each LIST line must use Label: value format. Leading bullets are optional and will be normalized automatically.',
+                    'package' => 'Each LIST line must use Label: value format, with or without a copied bullet prefix.',
                 ]);
             }
 

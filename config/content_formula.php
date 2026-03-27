@@ -12,9 +12,27 @@ return [
     */
 
     'generator' => [
+        'allowed_result_counts' => [25, 50, 100, 150],
         'default_result_count' => 50,
-        'max_result_count' => 50,
+        'max_result_count' => 150,
         'default_action' => 'generate',
+        'selection_limits' => [
+            'max_per_group' => 20,
+            'max_active_groups' => 10,
+        ],
+        'combination_unlock' => [
+            'minimum' => 1000,
+            'tracked_groups' => [
+                'topics',
+                'article_types',
+                'article_formats',
+                'vibes',
+                'reader_impacts',
+                'audiences',
+                'contexts',
+                'perspectives',
+            ],
+        ],
 
         /*
         |--------------------------------------------------------------------------
@@ -44,9 +62,12 @@ return [
 
         'required_groups' => [
             'topics',
-            'article_types',
-            'article_formats',
-            'vibes',
+        ],
+
+        'fallback_profile' => [
+            'article_type' => 'Insights',
+            'article_format' => 'Guide',
+            'vibe' => 'Clear',
         ],
 
         /*
@@ -122,7 +143,7 @@ return [
             'continue_limit' => 1,
         ],
         'paid' => [
-            'batch_size' => 50,
+            'batch_size' => 150,
             'reset_limit' => null,
             'continue_limit' => null,
         ],
@@ -251,7 +272,7 @@ return [
         'article_types' => [
             'label' => 'Type of Article',
             'description' => 'What kind of article you want to write.',
-            'required' => true,
+            'required' => false,
             'controlled' => true,
             'editable' => false,
             'tier' => 'core',
@@ -273,7 +294,7 @@ return [
         'article_formats' => [
             'label' => 'Article Format',
             'description' => 'How the article is written.',
-            'required' => true,
+            'required' => false,
             'controlled' => true,
             'editable' => false,
             'tier' => 'core',
@@ -297,7 +318,7 @@ return [
         'vibes' => [
             'label' => 'Vibe',
             'description' => 'How the article feels to read.',
-            'required' => true,
+            'required' => false,
             'controlled' => true,
             'editable' => false,
             'tier' => 'core',
@@ -498,7 +519,29 @@ return [
             [
                 'key' => 'seo_optimized',
                 'label' => 'SEO Optimized',
-                'template' => 'Generate a complete blog post package on :topic from a :article_type angle using a :article_format format for :audience_fallback. Tone: :vibe. Context: :context_fallback:perspective_clause. :length_instruction STRICT OUTPUT CONTRACT. First character of the response must be T in TITLE:. Start the response with TITLE:. Do not write anything before TITLE:. Return output in this exact order only. TITLE: [single line title] ARTICLE: [full article body] LIST: - SEO Title: [value] - Slug: [value] - Excerpt: [value] - Sources: [value] - Category: [value] - Tags: [comma-separated values] - Meta Title: [value] - Meta Description: [value] - Canonical URL: [value] - OG Title: [value] - OG Description: [value] - Featured Image Path: [value] - OG Image Path: [value] - Noindex: [Yes or No] RULES: exact labels only. exact order only. Under LIST:, every line must begin with "- " exactly. Do not output LIST fields without the "- " prefix. Do not write anything after the Noindex line. no JSON. no code fences. no commentary. no explanations. no extra headings. do not rename fields. do not omit fields. ARTICLE = article only. LIST = metadata only. article first. field list second. Tags = one comma-separated line. Sources = one line. Noindex = Yes or No. Canonical URL = full URL. Featured Image Path and OG Image Path = explicit paths. infer best values if needed. THIS FORMAT IS REQUIRED. IT IS NOT A SUGGESTION. USE THIS EXACT RESPONSE SHAPE. REQUIRED RESPONSE EXAMPLE: TITLE: Example Title ARTICLE: Example article body. LIST: - SEO Title: Example SEO Title - Slug: example-slug - Excerpt: Example excerpt. - Sources: Example source line. - Category: Example Category - Tags: example one, example two, example three - Meta Title: Example Meta Title - Meta Description: Example meta description. - Canonical URL: https://www.yourdomain.com/blog/example-slug - OG Title: Example OG Title - OG Description: Example OG description. - Featured Image Path: /images/blog/example-cover.jpg - OG Image Path: /images/blog/example-og.jpg - Noindex: No:extra_direction_sentence',
+                'template' => 'Generate a complete blog post package on :topic from a :article_type angle using a :article_format format for :audience_fallback. Tone: :vibe. Context: :context_fallback:perspective_clause. :length_instruction STRICT OUTPUT CONTRACT. First character of the response must be T in TITLE:. Start the response with TITLE:. Do not write anything before TITLE:. Return output in this exact order only. TITLE: [single line title] ARTICLE: [full article body] LIST: - SEO Title: [value] - Slug: [value] - Excerpt: [value] - Sources: [value] - Category: [value] - Tags: [comma-separated values] - Meta Title: [value] - Meta Description: [value] - Canonical URL: [value] - OG Title: [value] - OG Description: [value] - Featured Image Path: [value] - OG Image Path: [value] - Noindex: [Yes or No] RULES: exact labels only. exact order only. Under LIST:, every line must begin with "- " exactly. Do not output LIST fields without the "- " prefix. Do not write anything after the Noindex line. no JSON. no code fences. no commentary. no explanations. no extra headings. do not rename fields. do not omit fields. ARTICLE = article only. LIST = metadata only. article first. field list second. Tags = one comma-separated line. Sources = one line. Noindex = Yes or No. Canonical URL = full URL. Featured Image Path and OG Image Path = explicit paths. infer best values if needed. THIS FORMAT IS REQUIRED. IT IS NOT A SUGGESTION. USE THIS EXACT RESPONSE SHAPE. REQUIRED RESPONSE EXAMPLE: TITLE: Example Title ARTICLE: Example article body. LIST: - SEO Title: Example SEO Title - Slug: example-slug - Excerpt: Example excerpt. - Sources: Example source line. - Category: Example Category - Tags: example one, example two, example three - Meta Title: Example Meta Title - Meta Description: Example meta description. - Canonical URL: https://www.yourdomain.com/blog/example-slug - OG Title: Example OG Title - OG Description: Example OG description. - Featured Image Path: /images/blog/example-cover.jpg - OG Image Path: /images/blog/example-og.jpg - Noindex: No:extra_direction_sentence MANDATORY SHAPE SAMPLE. Copy this line structure exactly:
+TITLE:
+Example Title
+
+ARTICLE:
+Example article body.
+
+LIST:
+- SEO Title: Example SEO Title
+- Slug: example-slug
+- Excerpt: Example excerpt.
+- Sources: Example source line.
+- Category: Example Category
+- Tags: example one, example two, example three
+- Meta Title: Example Meta Title
+- Meta Description: Example meta description.
+- Canonical URL: https://www.yourdomain.com/blog/example-slug
+- OG Title: Example OG Title
+- OG Description: Example OG description.
+- Featured Image Path: /images/blog/example-cover.jpg
+- OG Image Path: /images/blog/example-og.jpg
+- Noindex: No
+SHAPE RULES: TITLE:, ARTICLE:, and LIST: must each appear on their own line. The title text must start on the line after TITLE:. The article body must start on the line after ARTICLE:. LIST: must be on its own line. Every LIST line must begin with "- " exactly. Do not collapse TITLE:, ARTICLE:, or LIST: onto one line with their content.',
             ],
         ],
     ],

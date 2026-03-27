@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ContentFormula;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ContentFormula\GenerateContentFormulaRequest;
 use App\Services\ContentFormula\ContentFormulaGenerator;
+use App\Services\ContentFormula\ContentFormulaRules;
 use App\Services\ContentFormula\ContentFormulaSessionService;
 use App\Services\ContentFormula\ContentFormulaTierResolver;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ class ContentFormulaController extends Controller
 {
     public function __construct(
         protected ContentFormulaGenerator $generator,
+        protected ContentFormulaRules $rules,
         protected ContentFormulaTierResolver $tiers,
         protected ContentFormulaSessionService $sessions,
     ) {
@@ -91,8 +93,12 @@ class ContentFormulaController extends Controller
 
         return [
             'generator' => [
-                'default_result_count' => data_get($config, 'generator.default_result_count', 50),
-                'max_result_count' => data_get($config, 'generator.max_result_count', 50),
+                'allowed_result_counts' => $this->rules->allowedResultCounts(),
+                'default_result_count' => $this->rules->defaultResultCount(),
+                'max_result_count' => $this->rules->maxResultCount(),
+                'max_selections_per_group' => $this->rules->maxSelectionsPerGroup(),
+                'min_combination_threshold' => $this->rules->minimumUnlockCombinations(),
+                'combination_group_keys' => $this->rules->trackedCombinationGroups(),
                 'required_groups' => data_get($config, 'generator.required_groups', []),
                 'tier_1_groups' => data_get($config, 'generator.tier_1_groups', []),
                 'tier_2_groups' => data_get($config, 'generator.tier_2_groups', []),
@@ -151,7 +157,9 @@ class ContentFormulaController extends Controller
             'extra_direction' => (string) ($payload['extra_direction'] ?? ''),
             'min_words' => (int) $payload['min_words'],
             'max_words' => (int) $payload['max_words'],
-            'result_count' => min((int) ($payload['result_count'] ?? $tier['batch_size']), (int) $tier['batch_size']),
+            'result_count' => $this->rules->normalizeResultCount(
+                isset($payload['result_count']) ? (int) $payload['result_count'] : null
+            ),
         ];
     }
 
@@ -165,12 +173,12 @@ class ContentFormulaController extends Controller
 
         return [
             'tier' => $tier['name'],
-            'batch_size' => $tier['batch_size'],
+            'batch_size' => (int) ($session['settings']['result_count'] ?? $meta['requested_count'] ?? $tier['batch_size']),
             'can_continue' => !$exhausted && ($continueLimit === null || $continueCount < $continueLimit),
             'can_reset' => $resetLimit === null || $resetCount < $resetLimit,
             'remaining_continue_count' => $continueLimit === null ? null : max(0, $continueLimit - $continueCount),
             'remaining_reset_count' => $resetLimit === null ? null : max(0, $resetLimit - $resetCount),
-            'requested_count' => (int) ($meta['requested_count'] ?? $tier['batch_size']),
+            'requested_count' => (int) ($meta['requested_count'] ?? $session['settings']['result_count'] ?? $tier['batch_size']),
             'generated_count' => (int) ($meta['generated_count'] ?? 0),
             'estimated_core_combinations' => (int) ($meta['estimated_core_combinations'] ?? 0),
             'session_generated_count' => (int) ($session['generated_count'] ?? 0),
